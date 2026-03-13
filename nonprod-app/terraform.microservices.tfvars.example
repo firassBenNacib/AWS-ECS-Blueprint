@@ -1,0 +1,212 @@
+# Single-account gateway/microservices mode for a reusable multi-service application template.
+# The ecs_services map below is illustrative only. Replace service names, ports, env, and secrets with your own application contract.
+# Replace the digest placeholders and app secret ARNs before apply. The RDS endpoint/password and SMTP host resolve inside Terraform.
+
+project_name                         = "example-app"
+aws_region                            = "eu-west-1"
+dr_region                             = "us-west-2"
+nonprod_app_role_arn                  = null
+environment_domain                      = "microservices.example.com"
+route53_zone_id                       = null
+backend_geo_restriction_type          = "none"
+backend_geo_locations                 = []
+frontend_geo_restriction_type         = "none"
+frontend_geo_locations                = []
+destroy_mode_enabled                  = false
+security_baseline_enable_object_lock  = false
+rds_deletion_protection               = true
+rds_skip_final_snapshot_on_destroy    = false
+bucket_name                           = "example-app-frontend-nonprod"
+availability_zones                    = ["eu-west-1a", "eu-west-1b"]
+vpc_cidr                              = "10.40.0.0/16"
+public_app_subnet_cidrs               = ["10.40.1.0/24", "10.40.2.0/24"]
+private_app_subnet_cidrs              = ["10.40.21.0/24", "10.40.22.0/24"]
+private_db_subnet_cidrs               = ["10.40.11.0/24", "10.40.12.0/24"]
+private_app_nat_mode                  = "required"
+backend_container_image               = null
+app_runtime_mode                      = "gateway_microservices"
+backend_origin_protocol_policy        = "https-only"
+service_discovery_namespace_name      = "nonprod.example-app.internal"
+acm_cert_frontend                     = "arn:aws:acm:us-east-1:123456789012:certificate/195bc678-537a-4117-919b-d1780fb508dc"
+alb_certificate_arn                   = "arn:aws:acm:eu-west-1:123456789012:certificate/1d514e8a-7e7c-4352-aee4-8eb3b0521aef"
+backend_cache_policy_id               = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+backend_origin_request_policy_id      = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+origin_auth_header_ssm_parameter_name = "/example-app/nonprod/origin-auth/current"
+cloudfront_logs_bucket_name           = "example-app-cf-logs-nonprod"
+rds_instance_class                    = "db.t4g.micro"
+rds_enable_performance_insights       = false
+rds_username                          = "devops_app"
+enable_security_baseline              = false
+enable_account_security_controls      = false
+enable_aws_config                     = false
+
+org_id                 = null
+security_account_id    = null
+log_archive_account_id = null
+prod_account_id        = null
+
+ecs_services = {
+  gateway = {
+    image                    = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/gateway@sha256:REPLACE_ME"
+    container_port           = 8080
+    entrypoint               = ["/bin/sh", "-c"]
+    command                  = ["cp /etc/nginx/nginx.conf /tmp/nginx.conf && sed -i 's|include /etc/nginx/conf.d/\\*.conf;|include /tmp/default.conf;|' /tmp/nginx.conf && envsubst '$AUTH_SERVICE_UPSTREAM $API_SERVICE_UPSTREAM $AUDIT_SERVICE_UPSTREAM $NOTIFICATION_SERVICE_UPSTREAM' < /etc/nginx/templates/default.conf.template > /tmp/default.conf && exec nginx -c /tmp/nginx.conf -g 'daemon off;'"]
+    public                   = true
+    desired_count            = 1
+    min_count                = 1
+    max_count                = 2
+    health_check_path        = "/gateway/health"
+    enable_service_discovery = false
+    readonly_root_fs         = true
+    task_volumes = [
+      { name = "gateway-tmp" },
+      { name = "gateway-var-cache-nginx" },
+      { name = "gateway-var-run" }
+    ]
+    mount_points = [
+      { source_volume = "gateway-tmp", container_path = "/tmp" },
+      { source_volume = "gateway-var-cache-nginx", container_path = "/var/cache/nginx" },
+      { source_volume = "gateway-var-run", container_path = "/var/run" }
+    ]
+    env = {
+      AUTH_SERVICE_UPSTREAM         = "auth-service.nonprod.example-app.internal:8081"
+      API_SERVICE_UPSTREAM          = "api-service.nonprod.example-app.internal:8082"
+      AUDIT_SERVICE_UPSTREAM        = "audit-service.nonprod.example-app.internal:8084"
+      NOTIFICATION_SERVICE_UPSTREAM = "notification-service.nonprod.example-app.internal:8090"
+    }
+  }
+
+  auth-service = {
+    image             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/auth-service@sha256:REPLACE_ME"
+    container_port    = 8081
+    desired_count     = 1
+    min_count         = 1
+    max_count         = 2
+    health_check_path = "/auth/health"
+    env = {
+      SERVER_PORT                   = "8081"
+      APP_JWT_EXPIRATION_SECONDS    = "3600"
+      SPRING_DATASOURCE_URL         = "jdbc:mysql://__RDS_ENDPOINT__:3306/__RDS_DB_NAME__"
+      SPRING_DATASOURCE_USERNAME    = "devops_app"
+      SPRING_JPA_HIBERNATE_DDL_AUTO = "update"
+      AUDIT_URL                     = "http://audit-service.nonprod.example-app.internal:8084/audit/events"
+      AUDIT_TIMEOUT_MS              = "2000"
+    }
+    secret_arns = {
+      APP_JWT_SECRET            = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/app-jwt-secret"
+      APP_DEMO_USER_EMAIL       = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/app-demo-user-email"
+      APP_DEMO_USER_PASSWORD    = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/app-demo-user-password"
+      SPRING_DATASOURCE_PASSWORD = "__RDS_MASTER_PASSWORD_SECRET_ARN__"
+      AUDIT_API_KEY             = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/audit-api-key"
+    }
+  }
+
+  api-service = {
+    image             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/api-service@sha256:REPLACE_ME"
+    container_port    = 8082
+    desired_count     = 1
+    min_count         = 1
+    max_count         = 2
+    health_check_path = "/api/health"
+    env = {
+      SERVER_PORT                = "8082"
+      APP_JWT_EXPIRATION_SECONDS = "3600"
+      MAILER_URL                 = "http://mailer-service.nonprod.example-app.internal:8083/send"
+      MAILER_TIMEOUT_MS          = "5000"
+      AUDIT_URL                  = "http://audit-service.nonprod.example-app.internal:8084/audit/events"
+      AUDIT_TIMEOUT_MS           = "2000"
+      NOTIFY_URL                 = "http://notification-service.nonprod.example-app.internal:8090/notify"
+      NOTIFY_TIMEOUT_MS          = "3000"
+    }
+    secret_arns = {
+      APP_JWT_SECRET = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/app-jwt-secret"
+      MAILER_API_KEY = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/mailer-api-key"
+      AUDIT_API_KEY  = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/audit-api-key"
+      NOTIFY_API_KEY = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/notify-api-key"
+    }
+  }
+
+  audit-service = {
+    image             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/audit-service@sha256:REPLACE_ME"
+    container_port    = 8084
+    desired_count     = 1
+    min_count         = 1
+    max_count         = 2
+    health_check_path = "/audit/health"
+    env = {
+      SERVER_PORT                   = "8084"
+      SPRING_DATASOURCE_URL         = "jdbc:mysql://__RDS_ENDPOINT__:3306/__RDS_DB_NAME__"
+      SPRING_DATASOURCE_USERNAME    = "devops_app"
+      SPRING_JPA_HIBERNATE_DDL_AUTO = "update"
+    }
+    secret_arns = {
+      APP_JWT_SECRET            = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/app-jwt-secret"
+      SPRING_DATASOURCE_PASSWORD = "__RDS_MASTER_PASSWORD_SECRET_ARN__"
+      AUDIT_API_KEY             = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/audit-api-key"
+    }
+  }
+
+  mailer-service = {
+    image             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/mailer-service@sha256:REPLACE_ME"
+    container_port    = 8083
+    desired_count     = 1
+    min_count         = 1
+    max_count         = 2
+    health_check_path = "/health"
+    env = {
+      SERVER_PORT                               = "8083"
+      SPRING_MAIL_HOST                          = "__SMTP_HOST__"
+      SPRING_MAIL_PORT                          = "465"
+      SPRING_MAIL_PROTOCOL                      = "smtps"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH     = "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE = "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE = "false"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_DEBUG    = "false"
+      SPRING_MAIL_FROM                          = "noreply@nonprod.microservices.example.com"
+    }
+    secret_arns = {
+      MAILER_API_KEY       = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/mailer-api-key"
+      SPRING_MAIL_USERNAME = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/smtp-username"
+      SPRING_MAIL_PASSWORD = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/smtp-password"
+    }
+    extra_egress = [
+      {
+        description = "SMTPS to external mail provider"
+        protocol    = "tcp"
+        from_port   = 465
+        to_port     = 465
+        cidr_blocks = ["0.0.0.0/0"]
+      }
+    ]
+  }
+
+  notification-service = {
+    image             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/microservices/notification-service@sha256:REPLACE_ME"
+    container_port    = 8090
+    desired_count     = 1
+    min_count         = 1
+    max_count         = 2
+    health_check_path = "/health"
+    env = {
+      PORT                       = "8090"
+      LOG_LEVEL                  = "INFO"
+      TWILIO_TIMEOUT_MS          = "5000"
+      TWILIO_STATUS_CALLBACK_URL = "https://nonprod.microservices.example.com/notify/twilio/status"
+    }
+    secret_arns = {
+      NOTIFY_API_KEY     = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/notify-api-key"
+      TWILIO_ACCOUNT_SID = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/twilio-account-sid"
+      TWILIO_AUTH_TOKEN  = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/twilio-auth-token"
+      TWILIO_FROM_NUMBER = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:nonprod/twilio-from-number"
+    }
+    extra_egress = [
+      {
+        description = "HTTPS to Twilio and other external notification APIs"
+        protocol    = "tcp"
+        from_port   = 443
+        to_port     = 443
+        cidr_blocks = ["0.0.0.0/0"]
+      }
+    ]
+  }
+}

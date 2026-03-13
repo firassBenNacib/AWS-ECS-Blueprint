@@ -1,0 +1,19 @@
+name: Allowlist Expiry Watch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  allowlist-expiry-watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Check Upcoming Allowlist Expiry
+        run: bash .scripts/check_allowlist_expiry_window.sh ci/allowlists 14

@@ -1,0 +1,36 @@
+[
+  {
+    "id": "prod-app",
+    "label": "prod-app",
+    "path": "prod-app",
+    "slug": "prod-app",
+    "tfvars_file": "prod-app/terraform.tfvars.example",
+    "backend_config_file": "",
+    "backend_key": "prod-app/prod/terraform.tfstate",
+    "backend_region": "eu-west-1",
+    "role_env_var": "AWS_ROLE_ARN_PROD_APP",
+    "deploy_environment": "prod-app",
+    "aws_region": "eu-west-1",
+    "live_validation_enabled": true,
+    "live_validation_scheduled": false,
+    "live_validation_tfvars_env_var": "LIVE_VALIDATION_TFVARS_PROD_APP",
+    "live_validation_smoke_profile": "app"
+  },
+  {
+    "id": "nonprod-app",
+    "label": "nonprod-app",
+    "path": "nonprod-app",
+    "slug": "nonprod-app",
+    "tfvars_file": "nonprod-app/terraform.tfvars.example",
+    "backend_config_file": "",
+    "backend_key": "nonprod-app/nonprod/terraform.tfstate",
+    "backend_region": "eu-west-1",
+    "role_env_var": "AWS_ROLE_ARN_NONPROD_APP",
+    "deploy_environment": "nonprod-app",
+    "aws_region": "eu-west-1",
+    "live_validation_enabled": true,
+    "live_validation_scheduled": true,
+    "live_validation_tfvars_env_var": "LIVE_VALIDATION_TFVARS_NONPROD_APP",
+    "live_validation_smoke_profile": "app"
+  }
+]

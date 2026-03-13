@@ -1,0 +1,29 @@
+name: Setup Terraform
+description: Install Terraform and optionally enable a shared provider plugin cache.
+inputs:
+  enable-plugin-cache:
+    description: Enable Terraform plugin caching across workflow runs.
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Prepare Terraform plugin cache
+      if: ${{ inputs.enable-plugin-cache == 'true' }}
+      shell: bash
+      env:
+        TF_PLUGIN_CACHE_DIR_INPUT: ${{ env.TF_PLUGIN_CACHE_DIR }}
+      run: |
+        cache_dir="${TF_PLUGIN_CACHE_DIR_INPUT:-${GITHUB_WORKSPACE}/.terraform.d/plugin-cache}"
+        mkdir -p "${cache_dir}"
+        echo "TF_PLUGIN_CACHE_DIR=${cache_dir}" >> "${GITHUB_ENV}"
+
+    - name: Cache Terraform plugins
+      if: ${{ inputs.enable-plugin-cache == 'true' }}
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+        key: terraform-plugins-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3

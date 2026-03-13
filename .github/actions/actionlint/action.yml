@@ -1,0 +1,41 @@
+name: Run actionlint
+description: Lint GitHub Actions workflows and local composite actions.
+runs:
+  using: composite
+  steps:
+    - id: install
+      name: Install actionlint
+      shell: bash
+      env:
+        ACTIONLINT_VERSION: "1.7.11"
+      run: |
+        curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C "${RUNNER_TEMP}"
+        echo "executable=${RUNNER_TEMP}/actionlint" >> "${GITHUB_OUTPUT}"
+
+    - name: Run actionlint
+      shell: bash
+      env:
+        ACTIONLINT: ${{ steps.install.outputs.executable }}
+      run: |
+        cat <<'EOF' > actionlint-matcher.json
+        {"problemMatcher": [{
+          "owner": "actionlint",
+          "pattern": [{
+            "regexp": "^(.+?):(\\d+):(\\d+): (.+?) \\[(.+?)\\]$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "message": 4,
+            "code": 5
+          }]
+        }]}
+        EOF
+        echo "::add-matcher::actionlint-matcher.json"
+
+        config_args=()
+        if [[ -f .github/actionlint.yml ]]; then
+          config_args+=("-config-file" ".github/actionlint.yml")
+        fi
+
+        "${ACTIONLINT}" -color "${config_args[@]}"

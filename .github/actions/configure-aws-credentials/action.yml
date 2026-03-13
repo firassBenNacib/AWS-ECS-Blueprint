@@ -1,0 +1,50 @@
+name: Configure AWS Credentials
+description: Resolve a Terraform target role ARN and assume it with GitHub OIDC.
+inputs:
+  role_env_var:
+    description: Environment variable name that contains the AWS role ARN.
+    required: true
+  role_label:
+    description: Friendly label used in error messages.
+    required: false
+    default: ""
+  aws_region:
+    description: AWS region to configure for the session.
+    required: true
+  aws_role_arn_prod_app:
+    description: Production app AWS role ARN.
+    required: false
+    default: ""
+  aws_role_arn_nonprod_app:
+    description: Non-production app AWS role ARN.
+    required: false
+    default: ""
+outputs:
+  role_arn:
+    description: Resolved role ARN.
+    value: ${{ steps.resolve.outputs.role_arn }}
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      name: Resolve AWS role ARN
+      shell: bash
+      env:
+        INPUT_ROLE_ENV_VAR: ${{ inputs.role_env_var }}
+        INPUT_ROLE_LABEL: ${{ inputs.role_label }}
+        AWS_ROLE_ARN_PROD_APP: ${{ inputs.aws_role_arn_prod_app }}
+        AWS_ROLE_ARN_NONPROD_APP: ${{ inputs.aws_role_arn_nonprod_app }}
+      run: |
+        role_arn="$(printenv "${INPUT_ROLE_ENV_VAR}" || true)"
+        if [[ -z "${role_arn}" ]]; then
+          label="${INPUT_ROLE_LABEL:-${INPUT_ROLE_ENV_VAR}}"
+          echo "Missing AWS role secret for ${label}" >&2
+          exit 1
+        fi
+        echo "role_arn=${role_arn}" >> "${GITHUB_OUTPUT}"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+      with:
+        role-to-assume: ${{ steps.resolve.outputs.role_arn }}
+        aws-region: ${{ inputs.aws_region }}

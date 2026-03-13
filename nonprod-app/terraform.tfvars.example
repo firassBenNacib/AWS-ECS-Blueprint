@@ -1,0 +1,42 @@
+# Project identity: change when using this repo as a template for another project.
+project_name                       = "example-app"
+# Optional: set to a real DR ALB/API domain for CloudFront failover; null = use primary ALB.
+backend_failover_domain_name     = null
+# Optional backend CloudFront geo restriction. Use "none", "whitelist", or "blacklist".
+backend_geo_restriction_type     = "none"
+backend_geo_locations            = []
+frontend_geo_restriction_type    = "none"
+frontend_geo_locations           = []
+
+aws_region                       = "eu-west-1"
+dr_region                        = "us-west-2"
+nonprod_app_role_arn             = "arn:aws:iam::555555555555:role/TerraformExecutionRole"
+environment_domain                 = "example.com"
+route53_zone_id                  = null
+bucket_name                      = "example-app-frontend-nonprod"
+availability_zones               = ["eu-west-1a", "eu-west-1b"]
+vpc_cidr                         = "10.40.0.0/16"
+public_app_subnet_cidrs          = ["10.40.1.0/24", "10.40.2.0/24"]
+private_app_subnet_cidrs         = ["10.40.21.0/24", "10.40.22.0/24"]
+private_db_subnet_cidrs          = ["10.40.11.0/24", "10.40.12.0/24"]
+private_app_nat_mode             = "required"
+backend_container_image          = "555555555555.dkr.ecr.eu-west-1.amazonaws.com/example-app-backend-nonprod@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+backend_origin_protocol_policy   = "https-only"
+acm_cert_frontend                = "arn:aws:acm:us-east-1:555555555555:certificate/22222222-2222-2222-2222-222222222222"
+alb_certificate_arn              = "arn:aws:acm:eu-west-1:555555555555:certificate/33333333-3333-3333-3333-333333333333"
+backend_cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+backend_origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+origin_auth_header_ssm_parameter_name = "/example-app/nonprod/origin-auth/current"
+cloudfront_logs_bucket_name      = "example-app-cf-logs-nonprod"
+rds_instance_class               = "db.t4g.micro"
+rds_enable_performance_insights  = false
+rds_username                     = "appadmin"
+enable_security_baseline         = false
+enable_account_security_controls = false
+# In single-account mode, leave this false if prod-app already owns AWS Config.
+enable_aws_config                = false
+
+org_id                 = "o-xxxxxxxxxx"
+security_account_id    = "111111111111"
+log_archive_account_id = "222222222222"
+prod_account_id        = "444444444444"

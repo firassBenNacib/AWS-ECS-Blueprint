@@ -1,0 +1,255 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "ci/**"
+      - "modules/**"
+      - ".scripts/**"
+      - "prod-app/**"
+      - "nonprod-app/**"
+      - "*.tf"
+      - "*.tfvars"
+      - "*.tfvars.example"
+      - "*.hcl"
+      - "*.hcl.example"
+      - ".terraform.lock.hcl"
+  push:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "ci/**"
+      - "modules/**"
+      - ".scripts/**"
+      - "prod-app/**"
+      - "nonprod-app/**"
+      - "*.tf"
+      - "*.tfvars"
+      - "*.tfvars.example"
+      - "*.hcl"
+      - "*.hcl.example"
+      - ".terraform.lock.hcl"
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
+  TF_CLI_ARGS_plan: "-input=false -lock-timeout=5m"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+  CHECKOV_VERSION: "3.2.507"
+  TFSEC_VERSION: "v1.28.14"
+  TERRASCAN_VERSION: "1.19.9"
+
+jobs:
+  resolve-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      count: ${{ steps.targets.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Resolve full target matrix
+        id: targets
+        run: |
+          matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format json)"
+          count="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format count)"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+  terraform-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          enable-plugin-cache: "false"
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+  terraform-validate:
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Terraform init (no backend)
+        run: terraform -chdir="${{ matrix.path }}" init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir="${{ matrix.path }}" validate
+
+  tflint:
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Cache TFLint plugins
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4
+        with:
+          tflint_version: v0.61.0
+
+      - name: Init TFLint plugins
+        run: tflint --chdir="${{ matrix.path }}" --init
+
+      - name: Run TFLint
+        run: tflint --chdir="${{ matrix.path }}" --format compact
+
+  checkov-policy:
+    if: vars.ENABLE_CHECKOV != 'false' && needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install checkov
+        run: pip install --no-cache-dir "checkov==${CHECKOV_VERSION}"
+
+      - name: Run Checkov policy gate
+        run: bash .scripts/run_checkov_gate.sh "${{ matrix.tfvars_file }}" "${{ matrix.path }}"
+        env:
+          OUT_DIR: security-reports/checkov-${{ matrix.slug }}
+
+      - name: Upload Checkov artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: checkov-${{ matrix.slug }}
+          retention-days: 30
+          path: security-reports/checkov-${{ matrix.slug }}/
+
+  tfsec-policy:
+    if: vars.ENABLE_TFSEC != 'false' && needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install tfsec
+        run: |
+          curl -sSfL "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64" \
+            -o /usr/local/bin/tfsec
+          chmod +x /usr/local/bin/tfsec
+
+      - name: Run tfsec policy gate
+        run: bash .scripts/run_tfsec_gate.sh "${{ matrix.tfvars_file }}" "${{ matrix.path }}"
+        env:
+          OUT_DIR: security-reports/tfsec-${{ matrix.slug }}
+
+      - name: Upload tfsec artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tfsec-${{ matrix.slug }}
+          retention-days: 30
+          path: security-reports/tfsec-${{ matrix.slug }}/
+
+  trivy-config:
+    if: vars.ENABLE_TRIVY != 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # 0.24.0
+        with:
+          scan-type: "config"
+          scan-ref: "."
+          format: "json"
+          output: "trivy-config.json"
+          severity: "HIGH,CRITICAL"
+          exit-code: "1"
+          hide-progress: true
+
+      - name: Upload Trivy config artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-config
+          retention-days: 30
+          path: trivy-config.json
+
+  terrascan:
+    if: vars.ENABLE_TERRASCAN == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Terrascan
+        run: |
+          curl -sSfL "https://github.com/tenable/terrascan/releases/download/v${TERRASCAN_VERSION}/terrascan_${TERRASCAN_VERSION}_Linux_x86_64.tar.gz" \
+            -o "${RUNNER_TEMP}/terrascan.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/terrascan.tar.gz" -C "${RUNNER_TEMP}" terrascan
+          install "${RUNNER_TEMP}/terrascan" /usr/local/bin/terrascan
+
+      - name: Run Terrascan
+        run: bash .scripts/run_terrascan.sh .
+        env:
+          OUT_DIR: security-reports/terrascan
+
+      - name: Upload Terrascan artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terrascan
+          retention-days: 30
+          path: security-reports/terrascan/
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

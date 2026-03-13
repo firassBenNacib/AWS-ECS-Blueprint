@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - github-actions
+
+  - package-ecosystem: terraform
+    directories:
+      - /
+      - /prod-app
+      - /nonprod-app
+      - /modules/*
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - terraform

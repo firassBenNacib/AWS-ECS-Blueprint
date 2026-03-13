@@ -1,0 +1,39 @@
+formatter: markdown table
+
+recursive:
+  enabled: false
+
+sections:
+  hide: []
+  show:
+    - requirements
+    - providers
+    - modules
+    - resources
+    - inputs
+    - outputs
+
+output:
+  file: README.md
+  mode: inject
+  template: |-
+    <!-- BEGIN_TF_DOCS -->
+    {{ .Content }}
+    <!-- END_TF_DOCS -->
+
+settings:
+  anchor: false
+  color: false
+  default: true
+  description: true
+  escape: false
+  hide-empty: false
+  indent: 2
+  lockfile: true
+  required: true
+  sensitive: true
+  type: true
+
+sort:
+  enabled: true
+  by: required

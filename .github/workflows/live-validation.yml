@@ -1,0 +1,135 @@
+name: Terraform Live Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment root to validate"
+        required: true
+        default: "nonprod-app"
+        type: choice
+        options:
+          - prod-app
+          - nonprod-app
+  schedule:
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+
+jobs:
+  resolve-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      count: ${{ steps.targets.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Resolve Live Validation Targets
+        id: targets
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            matrix="$(python3 .scripts/terraform_target_matrix.py --mode single --target "${{ github.event.inputs.target }}" --live-validation-only --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py --mode single --target "${{ github.event.inputs.target }}" --live-validation-only --output-format count)"
+          else
+            matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --live-validation-only --scheduled-live-validation-only --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py --mode full --live-validation-only --scheduled-live-validation-only --output-format count)"
+          fi
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+  validate:
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    concurrency:
+      group: terraform-live-validation-${{ matrix.slug }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Resolve Validation Inputs
+        id: resolve_inputs
+        run: |
+          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
+          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
+          echo "workspace=lv-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
+          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
+          echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}" >> "${GITHUB_OUTPUT}"
+          echo "live_validation_smoke_profile=${{ matrix.live_validation_smoke_profile }}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_name=live-validation-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Materialize Validation tfvars
+        id: tfvars
+        env:
+          LIVE_VALIDATION_TFVARS_PROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_PROD_APP }}
+          LIVE_VALIDATION_TFVARS_NONPROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_NONPROD_APP }}
+        run: |
+          tfvars_env_var="${{ steps.resolve_inputs.outputs.live_validation_tfvars_env_var }}"
+          tfvars_content="$(printenv "${tfvars_env_var}" || true)"
+          if [[ -z "${tfvars_content}" ]]; then
+            if [[ "${{ github.event_name }}" == "schedule" ]]; then
+              echo "skip=true" >> "${GITHUB_OUTPUT}"
+              echo "reason=Missing validation tfvars secret ${tfvars_env_var}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            echo "Missing validation tfvars secret ${tfvars_env_var}" >&2
+            exit 1
+          fi
+
+          tfvars_path="${RUNNER_TEMP}/live-validation-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
+          printf '%s\n' "${tfvars_content}" > "${tfvars_path}"
+          echo "skip=false" >> "${GITHUB_OUTPUT}"
+          echo "tfvars_path=${tfvars_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Report Scheduled Skip
+        if: steps.tfvars.outputs.skip == 'true'
+        run: echo "${{ steps.tfvars.outputs.reason }}"
+
+      - name: Configure AWS Credentials
+        if: steps.tfvars.outputs.skip != 'true'
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ steps.resolve_inputs.outputs.role_env_var }}
+          role_label: ${{ steps.resolve_inputs.outputs.label }}
+          aws_region: ${{ steps.resolve_inputs.outputs.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Run Live Validation
+        if: steps.tfvars.outputs.skip != 'true'
+        run: |
+          bash .scripts/run_live_validation.sh \
+            --path "${{ steps.resolve_inputs.outputs.path }}" \
+            --workspace "${{ steps.resolve_inputs.outputs.workspace }}" \
+            --tfvars-file "${{ steps.tfvars.outputs.tfvars_path }}" \
+            --aws-region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+            --smoke-profile "${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}" \
+            --log-dir "${RUNNER_TEMP}/live-validation-${{ steps.resolve_inputs.outputs.slug }}"
+
+      - name: Upload Live Validation Artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.resolve_inputs.outputs.artifact_name }}
+          retention-days: 14
+          path: ${{ runner.temp }}/live-validation-${{ steps.resolve_inputs.outputs.slug }}/
+          if-no-files-found: ignore

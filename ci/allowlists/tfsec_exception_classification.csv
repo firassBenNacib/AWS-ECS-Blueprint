@@ -1,0 +1,2 @@
+rule_id,expected_unique_locations,category,justification,owner,ticket,expires_on
+"aws-iam-no-policy-wildcards","6","required_structural","Some AWS service APIs and CloudWatch Logs stream ARN patterns require wildcard scope for operational correctness","platform-security","SEC-1002","2026-06-03"

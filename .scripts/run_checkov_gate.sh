@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TFVARS_FILE="${1:-terraform.prod.tfvars}"
+WORKDIR="${2:-.}"
+ALLOWLIST_DIR="${ALLOWLIST_DIR:-ci/allowlists}"
+OUT_DIR="${OUT_DIR:-security-reports/checkov}"
+MAX_ALLOWLIST_DAYS="${MAX_ALLOWLIST_DAYS:-90}"
+CHECKOV_STRICT_ALLOWLIST="${CHECKOV_STRICT_ALLOWLIST:-}"
+CHECKOV_ALLOWLIST_FILE="${ALLOWLIST_DIR}/checkov_skipped_allowlist.txt"
+CHECKOV_SKIP_PATHS="${CHECKOV_SKIP_PATHS:-}"
+
+if [[ -z "${CHECKOV_SKIP_PATHS}" && "${WORKDIR}" == "." ]]; then
+  CHECKOV_SKIP_PATHS="nonprod-app,prod-app"
+fi
+
+if [[ -z "${CHECKOV_STRICT_ALLOWLIST}" ]]; then
+  if [[ "${WORKDIR}" == "." ]]; then
+    CHECKOV_STRICT_ALLOWLIST="true"
+  else
+    CHECKOV_STRICT_ALLOWLIST="false"
+  fi
+fi
+
+mkdir -p "${OUT_DIR}"
+
+for cmd in checkov python3; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "Missing required command: ${cmd}"
+    exit 1
+  fi
+done
+
+test -f "${TFVARS_FILE}" || {
+  echo "Missing tfvars file: ${TFVARS_FILE}"
+  exit 1
+}
+
+test -f "${CHECKOV_ALLOWLIST_FILE}" || {
+  echo "Missing checkov allowlist: ${CHECKOV_ALLOWLIST_FILE}"
+  exit 1
+}
+
+echo "Running checkov (failed checks must be zero)..."
+CHECKOV_ARGS=(-d "${WORKDIR}" --framework terraform -o json)
+
+if [[ -n "${CHECKOV_SKIP_PATHS}" ]]; then
+  IFS=',' read -r -a _checkov_skips <<< "${CHECKOV_SKIP_PATHS}"
+  for path in "${_checkov_skips[@]}"; do
+    trimmed="$(echo "${path}" | xargs)"
+    if [[ -n "${trimmed}" ]]; then
+      CHECKOV_ARGS+=("--skip-path" "${trimmed}")
+    fi
+  done
+fi
+
+checkov "${CHECKOV_ARGS[@]}" > "${OUT_DIR}/checkov.json" || true
+
+python3 - "${OUT_DIR}/checkov.json" "${CHECKOV_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${CHECKOV_STRICT_ALLOWLIST}" <<'PY'
+import json
+import re
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+checkov_json = Path(sys.argv[1])
+allowlist_file = Path(sys.argv[2])
+max_allowlist_days = int(sys.argv[3])
+strict_allowlist = sys.argv[4].lower() == "true"
+
+raw = checkov_json.read_text().strip()
+if not raw:
+    print("Rejected: checkov output is empty")
+    sys.exit(1)
+
+data = json.loads(raw)
+results = data.get("results", {})
+
+failed_checks = results.get("failed_checks", [])
+if failed_checks:
+    print("Rejected: checkov failed checks are not allowed:")
+    for item in failed_checks:
+        print(f"  - {item.get('check_id')} | {item.get('resource')}")
+    sys.exit(1)
+
+skipped_checks = results.get("skipped_checks", [])
+observed = set()
+for item in skipped_checks:
+    check_id = item.get("check_id")
+    resource = item.get("resource")
+    if check_id and resource:
+        observed.add((check_id, resource))
+
+allowlist_entries = set()
+expired_entries = []
+window_violations = []
+parse_errors = []
+today = date.today()
+max_expiry = today + timedelta(days=max_allowlist_days)
+
+for idx, raw_line in enumerate(allowlist_file.read_text().splitlines(), start=1):
+    line = raw_line.strip()
+    if not line or line.startswith("#"):
+        continue
+
+    parts = [part.strip() for part in line.split("|")]
+    if len(parts) != 6:
+        parse_errors.append(f"line {idx}: expected 6 pipe-delimited fields, got {len(parts)}")
+        continue
+
+    check_id, resource, justification, owner, ticket, expires_on = parts
+    if not check_id:
+        parse_errors.append(f"line {idx}: check_id is empty")
+        continue
+    if not resource:
+        parse_errors.append(f"line {idx}: resource is empty")
+        continue
+    if not owner or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,63}", owner):
+        parse_errors.append(f"line {idx}: owner '{owner}' must match [a-z0-9-] pattern")
+        continue
+    if not ticket or not re.fullmatch(r"[A-Z]+-[0-9]+", ticket):
+        parse_errors.append(f"line {idx}: ticket '{ticket}' must match pattern ABC-123")
+        continue
+
+    try:
+        expiry = date.fromisoformat(expires_on)
+    except ValueError:
+        parse_errors.append(f"line {idx}: invalid expires_on date '{expires_on}', expected YYYY-MM-DD")
+        continue
+
+    if expiry < today:
+        expired_entries.append((idx, check_id, resource, expires_on))
+    if expiry > max_expiry:
+        window_violations.append((idx, check_id, resource, expires_on))
+
+    key = (check_id, resource)
+    if key in allowlist_entries:
+        parse_errors.append(f"line {idx}: duplicate allowlist entry '{check_id}|{resource}'")
+        continue
+    allowlist_entries.add(key)
+
+if parse_errors:
+    print("Rejected: checkov allowlist format errors:")
+    for err in parse_errors:
+        print(f"  - {err}")
+    sys.exit(1)
+
+if expired_entries:
+    print("Rejected: checkov allowlist has expired entries:")
+    for idx, check_id, resource, expires_on in expired_entries:
+        print(f"  - line {idx}: {check_id}|{resource} expired on {expires_on}")
+    sys.exit(1)
+
+if window_violations:
+    print(f"Rejected: checkov allowlist expiry exceeds max window ({max_allowlist_days} days):")
+    for idx, check_id, resource, expires_on in window_violations:
+        print(f"  - line {idx}: {check_id}|{resource} expires on {expires_on}")
+    sys.exit(1)
+
+unexpected = sorted(observed - allowlist_entries)
+if unexpected:
+    print("Rejected: unexpected skipped checkov checks:")
+    for check_id, resource in unexpected:
+        print(f"  - {check_id}|{resource}")
+    sys.exit(1)
+
+stale = sorted(allowlist_entries - observed)
+if strict_allowlist and stale:
+    print("Rejected: stale checkov allowlist entries not observed in skipped checks:")
+    for check_id, resource in stale:
+        print(f"  - {check_id}|{resource}")
+    sys.exit(1)
+
+print("checkov skipped-check allowlist policy passed.")
+PY

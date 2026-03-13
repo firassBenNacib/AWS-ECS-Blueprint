@@ -1,0 +1,370 @@
+name: Deploy Terraform
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "ci/**"
+      - "modules/**"
+      - ".scripts/**"
+      - "prod-app/**"
+      - "nonprod-app/**"
+      - "*.tf"
+      - "*.tfvars"
+      - "*.tfvars.example"
+      - "*.hcl"
+      - "*.hcl.example"
+      - ".terraform.lock.hcl"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Terraform target to deploy"
+        required: true
+        default: "prod-app"
+        type: choice
+        options:
+          - prod-app
+          - nonprod-app
+      tfvars_file:
+        description: "Optional var-file override"
+        required: false
+        default: ""
+      backend_config_file:
+        description: "Optional backend config override"
+        required: false
+        default: ""
+      apply_after_plan:
+        description: "Apply the saved plan after approval"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
+  TF_CLI_ARGS_plan: "-input=false -lock-timeout=5m"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
+
+jobs:
+  resolve-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      count: ${{ steps.targets.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Workflow Target Matrix
+        id: targets
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            matrix="$(python3 .scripts/terraform_target_matrix.py \
+              --mode single \
+              --target "${{ github.event.inputs.target }}" \
+              --tfvars-override "${{ github.event.inputs.tfvars_file }}" \
+              --backend-override "${{ github.event.inputs.backend_config_file }}" \
+              --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py \
+              --mode single \
+              --target "${{ github.event.inputs.target }}" \
+              --tfvars-override "${{ github.event.inputs.tfvars_file }}" \
+              --backend-override "${{ github.event.inputs.backend_config_file }}" \
+              --output-format count)"
+          else
+            matrix="$(python3 .scripts/terraform_target_matrix.py --mode changed --base-sha "${{ github.event.before }}" --head-sha "${{ github.sha }}" --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py --mode changed --base-sha "${{ github.event.before }}" --head-sha "${{ github.sha }}" --output-format count)"
+          fi
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+  plan:
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Resolve Inputs
+        id: resolve_inputs
+        run: |
+          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
+          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
+          echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")" >> "${GITHUB_OUTPUT}"
+          if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
+            echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")" >> "${GITHUB_OUTPUT}"
+          else
+            echo "backend_cfg_abs=" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "backend_key=${{ matrix.backend_key }}" >> "${GITHUB_OUTPUT}"
+          echo "backend_region=${{ matrix.backend_region }}" >> "${GITHUB_OUTPUT}"
+          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
+          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_environment=${{ matrix.deploy_environment }}" >> "${GITHUB_OUTPUT}"
+          echo "plan_artifact_name=terraform-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          echo "result_artifact_name=terraform-plan-result-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          echo "trivy_plan_artifact_name=trivy-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ steps.resolve_inputs.outputs.role_env_var }}
+          role_label: ${{ steps.resolve_inputs.outputs.label }}
+          aws_region: ${{ steps.resolve_inputs.outputs.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Create Saved Plan
+        id: saved_plan
+        continue-on-error: true
+        run: |
+          artifact_dir="${RUNNER_TEMP}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}"
+          mkdir -p "${artifact_dir}"
+          result_json="${artifact_dir}/result.json"
+          plan_txt="${artifact_dir}/tfplan.txt"
+          plan_bin="${artifact_dir}/tfplan"
+          plan_json="${artifact_dir}/tfplan.json"
+
+          init_args=()
+          if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
+            init_args+=("-backend-config=${{ steps.resolve_inputs.outputs.backend_cfg_abs }}")
+          else
+            if [[ -z "${TF_BACKEND_BUCKET}" ]]; then
+              echo "Missing TF_BACKEND_BUCKET repo variable" > "${plan_txt}"
+              python3 .scripts/write_json_result.py \
+                --output "${result_json}" \
+                --set path "${{ steps.resolve_inputs.outputs.path }}" \
+                --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+                --set label "${{ steps.resolve_inputs.outputs.label }}" \
+                --set tfvars_file "${{ matrix.tfvars_file }}" \
+                --set backend_config_file "${{ matrix.backend_config_file }}" \
+                --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+                --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+                --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+                --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+                --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+                --set status "error" \
+                --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+              exit 1
+            fi
+            backend_region="${TF_BACKEND_REGION:-${{ steps.resolve_inputs.outputs.backend_region }}}"
+            init_args+=("-backend-config=bucket=${TF_BACKEND_BUCKET}")
+            init_args+=("-backend-config=key=${{ steps.resolve_inputs.outputs.backend_key }}")
+            init_args+=("-backend-config=region=${backend_region}")
+            init_args+=("-backend-config=encrypt=true")
+          fi
+
+          if ! terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" > "${plan_txt}" 2>&1; then
+            python3 .scripts/write_json_result.py \
+              --output "${result_json}" \
+              --set path "${{ steps.resolve_inputs.outputs.path }}" \
+              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+              --set label "${{ steps.resolve_inputs.outputs.label }}" \
+              --set tfvars_file "${{ matrix.tfvars_file }}" \
+              --set backend_config_file "${{ matrix.backend_config_file }}" \
+              --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+              --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+              --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+              --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+              --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+              --set status "error" \
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+            exit 1
+          fi
+
+          set +e
+          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -input=false -out="${plan_bin}" -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+          exit_code=$?
+          set -e
+
+          if [[ "${exit_code}" -eq 0 ]]; then
+            terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -no-color "${plan_bin}" > "${plan_txt}.rendered"
+            mv "${plan_txt}.rendered" "${plan_txt}"
+            terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -json "${plan_bin}" > "${plan_json}"
+            (
+              cd "${artifact_dir}"
+              sha256sum tfplan tfplan.txt tfplan.json > tfplan.sha256
+            )
+            python3 .scripts/write_json_result.py \
+              --output "${result_json}" \
+              --set path "${{ steps.resolve_inputs.outputs.path }}" \
+              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+              --set label "${{ steps.resolve_inputs.outputs.label }}" \
+              --set tfvars_file "${{ matrix.tfvars_file }}" \
+              --set backend_config_file "${{ matrix.backend_config_file }}" \
+              --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+              --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+              --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+              --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+              --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+              --set status "plan_ready" \
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+            exit 0
+          fi
+
+          python3 .scripts/write_json_result.py \
+            --output "${result_json}" \
+            --set path "${{ steps.resolve_inputs.outputs.path }}" \
+            --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+            --set label "${{ steps.resolve_inputs.outputs.label }}" \
+            --set tfvars_file "${{ matrix.tfvars_file }}" \
+            --set backend_config_file "${{ matrix.backend_config_file }}" \
+            --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+            --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+            --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+            --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+            --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+            --set status "error" \
+            --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+          exit 1
+
+      - name: Advisory Trivy Plan Scan
+        if: always() && vars.ENABLE_TRIVY_PLAN != 'false' && steps.saved_plan.outcome == 'success'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # 0.24.0
+        with:
+          scan-type: "config"
+          scan-ref: "${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.json"
+          format: "json"
+          output: "${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/trivy-plan.json"
+          severity: "HIGH,CRITICAL"
+          exit-code: "0"
+          hide-progress: true
+
+      - name: Upload Saved Plan Artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.resolve_inputs.outputs.plan_artifact_name }}
+          retention-days: 30
+          path: |
+            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan
+            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.txt
+            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.json
+            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.sha256
+          if-no-files-found: ignore
+
+      - name: Upload Trivy Plan Artifact
+        if: always() && vars.ENABLE_TRIVY_PLAN != 'false'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.resolve_inputs.outputs.trivy_plan_artifact_name }}
+          retention-days: 30
+          path: ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/trivy-plan.json
+          if-no-files-found: ignore
+
+      - name: Upload Plan Result Artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.resolve_inputs.outputs.result_artifact_name }}
+          retention-days: 30
+          path: ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/result.json
+          if-no-files-found: ignore
+
+  collect-plan-results:
+    if: always() && needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+      - plan
+    runs-on: ubuntu-latest
+    outputs:
+      apply_matrix: ${{ steps.collect.outputs.apply_matrix }}
+      apply_count: ${{ steps.collect.outputs.apply_count }}
+    steps:
+      - name: Download Plan Result Artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: terraform-plan-result-*
+          merge-multiple: true
+          path: deploy-results
+
+      - name: Build Apply Matrix
+        id: collect
+        run: |
+          python3 .scripts/build_apply_matrix.py \
+            --results-dir deploy-results \
+            --github-output "${GITHUB_OUTPUT}"
+
+  apply:
+    if: always() && needs.collect-plan-results.outputs.apply_count != '0' && (github.event_name == 'push' || github.event.inputs.apply_after_plan == 'true')
+    needs:
+      - resolve-targets
+      - plan
+      - collect-plan-results
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.collect-plan-results.outputs.apply_matrix) }}
+    concurrency:
+      group: terraform-apply-${{ matrix.slug }}
+      cancel-in-progress: false
+    environment: ${{ matrix.deploy_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ matrix.role_env_var }}
+          role_label: ${{ matrix.label }}
+          aws_region: ${{ matrix.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Download Saved Plan Artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/downloaded-plan-${{ matrix.slug }}
+
+      - name: Verify Saved Plan Integrity
+        run: |
+          artifact_dir="${RUNNER_TEMP}/downloaded-plan-${{ matrix.slug }}"
+          (
+            cd "${artifact_dir}"
+            sha256sum -c tfplan.sha256
+          )
+
+      - name: Apply Saved Plan
+        run: |
+          init_args=()
+          if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
+            init_args+=("-backend-config=${{ matrix.backend_config_file }}")
+          else
+            test -n "${TF_BACKEND_BUCKET}" || (echo "Missing TF_BACKEND_BUCKET repo variable" && exit 1)
+            backend_region="${TF_BACKEND_REGION:-${{ matrix.backend_region }}}"
+            init_args+=("-backend-config=bucket=${TF_BACKEND_BUCKET}")
+            init_args+=("-backend-config=key=${{ matrix.backend_key }}")
+            init_args+=("-backend-config=region=${backend_region}")
+            init_args+=("-backend-config=encrypt=true")
+          fi
+
+          terraform -chdir="${{ matrix.path }}" init "${init_args[@]}"
+          terraform -chdir="${{ matrix.path }}" apply -input=false "${RUNNER_TEMP}/downloaded-plan-${{ matrix.slug }}/tfplan"
