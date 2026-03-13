@@ -17,7 +17,6 @@ An AWS Terraform blueprint for private web workloads on ECS Fargate, with CloudF
 - [Repository Layout](#repository-layout)
 - [Make Targets](#make-targets)
 - [CI/CD and GitHub Actions](#cicd-and-github-actions)
-- [Public vs Local Files](#public-vs-local-files)
 - [License](#license)
 
 ## Prerequisites
@@ -156,25 +155,6 @@ Secrets used by the GitHub OIDC deployment path:
 - `AWS_ROLE_ARN_NONPROD_APP`
 
 Live validation also uses per-root tfvars secrets, documented in [`docs/ci-cd.md`](./docs/ci-cd.md).
-
-## Public vs Local Files
-
-Safe to push to a public repository:
-
-- Terraform modules under [`modules/`](./modules)
-- deployment roots and example files under [`prod-app/`](./prod-app) and [`nonprod-app/`](./nonprod-app)
-- documentation under [`docs/`](./docs)
-- repository metadata and workflows under [`.github/`](./.github)
-- architecture assets under [`img/`](./img)
-- helper scripts under [`.scripts/`](./.scripts)
-
-Keep local and do not commit:
-
-- `backend.hcl`
-- `terraform.tfvars`
-- any real account IDs, domains, cert ARNs, secret ARNs, or image digests
-- Terraform state files and `.terraform/` working directories
-- local scratch or extracted assets under `tmp/`
 
 ## License
 

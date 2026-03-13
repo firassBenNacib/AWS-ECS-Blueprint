@@ -5,11 +5,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/**"
-      - ".github/actions/**"
-      - "ci/**"
       - "modules/**"
-      - ".scripts/**"
       - "prod-app/**"
       - "nonprod-app/**"
       - "*.tf"
@@ -131,7 +127,39 @@ jobs:
             echo "trivy_plan_artifact_name=trivy-plan-${{ matrix.slug }}"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Check Deploy Prerequisites
+        id: deploy_prereqs
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+          TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+        run: |
+          role_env_var="${{ steps.resolve_inputs.outputs.role_env_var }}"
+          role_arn="$(printenv "${role_env_var}" || true)"
+
+          if [[ -z "${role_arn}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing AWS role secret for ${{ steps.resolve_inputs.outputs.label }}"
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if [[ -z "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" && -z "${TF_BACKEND_BUCKET}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing TF_BACKEND_BUCKET repo variable"
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "skip=false"
+            echo "reason="
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Configure AWS Credentials
+        if: steps.deploy_prereqs.outputs.skip != 'true'
         uses: ./.github/actions/configure-aws-credentials
         with:
           role_env_var: ${{ steps.resolve_inputs.outputs.role_env_var }}
@@ -150,6 +178,25 @@ jobs:
           plan_txt="${artifact_dir}/tfplan.txt"
           plan_bin="${artifact_dir}/tfplan"
           plan_json="${artifact_dir}/tfplan.json"
+
+          if [[ "${{ steps.deploy_prereqs.outputs.skip }}" == "true" ]]; then
+            echo "${{ steps.deploy_prereqs.outputs.reason }}" > "${plan_txt}"
+            python3 .scripts/write_json_result.py \
+              --output "${result_json}" \
+              --set path "${{ steps.resolve_inputs.outputs.path }}" \
+              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+              --set label "${{ steps.resolve_inputs.outputs.label }}" \
+              --set tfvars_file "${{ matrix.tfvars_file }}" \
+              --set backend_config_file "${{ matrix.backend_config_file }}" \
+              --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+              --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+              --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+              --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+              --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+              --set status "skipped" \
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+            exit 0
+          fi
 
           init_args=()
           if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
