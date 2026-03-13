@@ -59,8 +59,10 @@ jobs:
         run: |
           matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format json)"
           count="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format count)"
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   terraform-fmt:
     runs-on: ubuntu-latest
@@ -116,7 +118,7 @@ jobs:
           key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
         with:
           tflint_version: v0.61.0
 
@@ -153,7 +155,7 @@ jobs:
 
       - name: Upload Checkov artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: checkov-${{ matrix.slug }}
           retention-days: 30
@@ -173,9 +175,11 @@ jobs:
 
       - name: Install tfsec
         run: |
-          curl -sSfL "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64" \
-            -o /usr/local/bin/tfsec
-          chmod +x /usr/local/bin/tfsec
+          tmp_bin="$(mktemp)"
+          curl --retry 5 --retry-delay 2 --retry-all-errors -sSfL \
+            "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64" \
+            -o "${tmp_bin}"
+          install -m 0755 "${tmp_bin}" /usr/local/bin/tfsec
 
       - name: Run tfsec policy gate
         run: bash .scripts/run_tfsec_gate.sh "${{ matrix.tfvars_file }}" "${{ matrix.path }}"
@@ -184,7 +188,7 @@ jobs:
 
       - name: Upload tfsec artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: tfsec-${{ matrix.slug }}
           retention-days: 30
@@ -210,7 +214,7 @@ jobs:
 
       - name: Upload Trivy config artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: trivy-config
           retention-days: 30
@@ -237,7 +241,7 @@ jobs:
 
       - name: Upload Terrascan artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: terrascan
           retention-days: 30
@@ -248,8 +252,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ci-status:
+    name: Terraform CI
+    if: always()
+    needs:
+      - resolve-targets
+      - terraform-fmt
+      - terraform-validate
+      - tflint
+      - checkov-policy
+      - tfsec-policy
+      - trivy-config
+      - terrascan
+      - gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate Terraform CI result
+        run: |
+          python3 - <<'PY'
+          import json
+
+          needs = json.loads(r'''${{ toJson(needs) }}''')
+          failures = {
+              name: data["result"]
+              for name, data in needs.items()
+              if data["result"] not in ("success", "skipped")
+          }
+          if failures:
+              raise SystemExit(f"Terraform CI workflow failures: {failures}")
+          print("Terraform CI workflow passed.")
+          PY

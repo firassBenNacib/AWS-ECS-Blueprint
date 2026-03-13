@@ -53,7 +53,3 @@ make scan-targets
 - Include validation steps and results.
 - Update docs when behavior, layout, or operator workflow changes.
 - Use the pull request template under [`PULL_REQUEST_TEMPLATE/`](./PULL_REQUEST_TEMPLATE).
-
-## Security Reports
-
-Do not open public issues for suspected vulnerabilities. Follow the repository [security policy](./SECURITY.md).
