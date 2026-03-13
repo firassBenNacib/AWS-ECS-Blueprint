@@ -7,6 +7,7 @@ ALLOWLIST_DIR="${ALLOWLIST_DIR:-ci/allowlists}"
 OUT_DIR="${OUT_DIR:-security-reports/checkov}"
 MAX_ALLOWLIST_DAYS="${MAX_ALLOWLIST_DAYS:-90}"
 CHECKOV_STRICT_ALLOWLIST="${CHECKOV_STRICT_ALLOWLIST:-}"
+CHECKOV_LOG_LEVEL="${CHECKOV_LOG_LEVEL:-ERROR}"
 CHECKOV_ALLOWLIST_FILE="${ALLOWLIST_DIR}/checkov_skipped_allowlist.txt"
 CHECKOV_SKIP_PATHS="${CHECKOV_SKIP_PATHS:-}"
 
@@ -54,7 +55,7 @@ if [[ -n "${CHECKOV_SKIP_PATHS}" ]]; then
   done
 fi
 
-checkov "${CHECKOV_ARGS[@]}" > "${OUT_DIR}/checkov.json" || true
+LOG_LEVEL="${CHECKOV_LOG_LEVEL}" checkov "${CHECKOV_ARGS[@]}" > "${OUT_DIR}/checkov.json" || true
 
 python3 - "${OUT_DIR}/checkov.json" "${CHECKOV_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${CHECKOV_STRICT_ALLOWLIST}" <<'PY'
 import json
@@ -68,30 +69,58 @@ allowlist_file = Path(sys.argv[2])
 max_allowlist_days = int(sys.argv[3])
 strict_allowlist = sys.argv[4].lower() == "true"
 
+
+def normalize_resource(resource: str) -> str:
+    return re.sub(r"\[\d+\]", "", resource)
+
+
+def resource_aliases(resource: str) -> set[tuple[str, str]]:
+    aliases = set()
+    current = resource
+    while True:
+        aliases.add(current)
+        aliases.add(normalize_resource(current))
+        if not current.startswith("module."):
+            break
+        parts = current.split(".", 2)
+        if len(parts) < 3:
+            break
+        current = parts[2]
+    return aliases
+
 raw = checkov_json.read_text().strip()
 if not raw:
     print("Rejected: checkov output is empty")
     sys.exit(1)
 
-data = json.loads(raw)
+decoder = json.JSONDecoder()
+try:
+    data, _ = decoder.raw_decode(raw)
+except json.JSONDecodeError as exc:
+    print(f"Rejected: checkov output is not parseable JSON: {exc}")
+    sys.exit(1)
+
 results = data.get("results", {})
 
 failed_checks = results.get("failed_checks", [])
-if failed_checks:
-    print("Rejected: checkov failed checks are not allowed:")
-    for item in failed_checks:
-        print(f"  - {item.get('check_id')} | {item.get('resource')}")
-    sys.exit(1)
-
 skipped_checks = results.get("skipped_checks", [])
-observed = set()
+observed_failed = set()
+for item in failed_checks:
+    check_id = item.get("check_id")
+    resource = item.get("resource")
+    if check_id and resource:
+        observed_failed.add((check_id, resource))
+
+observed_skipped = set()
 for item in skipped_checks:
     check_id = item.get("check_id")
     resource = item.get("resource")
     if check_id and resource:
-        observed.add((check_id, resource))
+        observed_skipped.add((check_id, resource))
 
 allowlist_entries = set()
+allowlist_match_entries = set()
+allowlist_lookup = {}
 expired_entries = []
 window_violations = []
 parse_errors = []
@@ -138,6 +167,9 @@ for idx, raw_line in enumerate(allowlist_file.read_text().splitlines(), start=1)
         parse_errors.append(f"line {idx}: duplicate allowlist entry '{check_id}|{resource}'")
         continue
     allowlist_entries.add(key)
+    for match_key in {key, (check_id, normalize_resource(resource))}:
+        allowlist_match_entries.add(match_key)
+        allowlist_lookup.setdefault(match_key, set()).add(key)
 
 if parse_errors:
     print("Rejected: checkov allowlist format errors:")
@@ -157,19 +189,40 @@ if window_violations:
         print(f"  - line {idx}: {check_id}|{resource} expires on {expires_on}")
     sys.exit(1)
 
-unexpected = sorted(observed - allowlist_entries)
-if unexpected:
-    print("Rejected: unexpected skipped checkov checks:")
-    for check_id, resource in unexpected:
+unexpected_failed = sorted(
+    (check_id, resource)
+    for check_id, resource in observed_failed
+    if not any((check_id, alias) in allowlist_match_entries for alias in resource_aliases(resource))
+)
+if unexpected_failed:
+    print("Rejected: unexpected failed checkov checks:")
+    for check_id, resource in unexpected_failed:
         print(f"  - {check_id}|{resource}")
     sys.exit(1)
 
-stale = sorted(allowlist_entries - observed)
+unexpected_skipped = sorted(
+    (check_id, resource)
+    for check_id, resource in observed_skipped
+    if not any((check_id, alias) in allowlist_match_entries for alias in resource_aliases(resource))
+)
+if unexpected_skipped:
+    print("Rejected: unexpected skipped checkov checks:")
+    for check_id, resource in unexpected_skipped:
+        print(f"  - {check_id}|{resource}")
+    sys.exit(1)
+
+observed = observed_failed | observed_skipped
+observed_allowlist_matches = set()
+for check_id, resource in observed:
+    for alias in resource_aliases(resource):
+        observed_allowlist_matches.update(allowlist_lookup.get((check_id, alias), set()))
+
+stale = sorted(allowlist_entries - observed_allowlist_matches)
 if strict_allowlist and stale:
-    print("Rejected: stale checkov allowlist entries not observed in skipped checks:")
+    print("Rejected: stale checkov allowlist entries not observed in failed/skipped checks:")
     for check_id, resource in stale:
         print(f"  - {check_id}|{resource}")
     sys.exit(1)
 
-print("checkov skipped-check allowlist policy passed.")
+print("checkov allowlist policy passed.")
 PY

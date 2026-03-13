@@ -43,8 +43,10 @@ jobs:
             matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --live-validation-only --scheduled-live-validation-only --output-format json)"
             count="$(python3 .scripts/terraform_target_matrix.py --mode full --live-validation-only --scheduled-live-validation-only --output-format count)"
           fi
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   validate:
     if: needs.resolve-targets.outputs.count != '0'
@@ -67,15 +69,17 @@ jobs:
       - name: Resolve Validation Inputs
         id: resolve_inputs
         run: |
-          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
-          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
-          echo "workspace=lv-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
-          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
-          echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}" >> "${GITHUB_OUTPUT}"
-          echo "live_validation_smoke_profile=${{ matrix.live_validation_smoke_profile }}" >> "${GITHUB_OUTPUT}"
-          echo "artifact_name=live-validation-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "path=${{ matrix.path }}"
+            echo "slug=${{ matrix.slug }}"
+            echo "label=${{ matrix.label }}"
+            echo "workspace=lv-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}"
+            echo "aws_region=${{ matrix.aws_region }}"
+            echo "role_env_var=${{ matrix.role_env_var }}"
+            echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}"
+            echo "live_validation_smoke_profile=${{ matrix.live_validation_smoke_profile }}"
+            echo "artifact_name=live-validation-${{ matrix.slug }}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Materialize Validation tfvars
         id: tfvars
@@ -87,8 +91,10 @@ jobs:
           tfvars_content="$(printenv "${tfvars_env_var}" || true)"
           if [[ -z "${tfvars_content}" ]]; then
             if [[ "${{ github.event_name }}" == "schedule" ]]; then
-              echo "skip=true" >> "${GITHUB_OUTPUT}"
-              echo "reason=Missing validation tfvars secret ${tfvars_env_var}" >> "${GITHUB_OUTPUT}"
+              {
+                echo "skip=true"
+                echo "reason=Missing validation tfvars secret ${tfvars_env_var}"
+              } >> "${GITHUB_OUTPUT}"
               exit 0
             fi
             echo "Missing validation tfvars secret ${tfvars_env_var}" >&2
@@ -97,8 +103,10 @@ jobs:
 
           tfvars_path="${RUNNER_TEMP}/live-validation-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
           printf '%s\n' "${tfvars_content}" > "${tfvars_path}"
-          echo "skip=false" >> "${GITHUB_OUTPUT}"
-          echo "tfvars_path=${tfvars_path}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "skip=false"
+            echo "tfvars_path=${tfvars_path}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Report Scheduled Skip
         if: steps.tfvars.outputs.skip == 'true'

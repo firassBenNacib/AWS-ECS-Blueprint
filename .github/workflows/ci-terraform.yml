@@ -59,8 +59,10 @@ jobs:
         run: |
           matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format json)"
           count="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format count)"
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   terraform-fmt:
     runs-on: ubuntu-latest

@@ -56,8 +56,10 @@ jobs:
             matrix='{"include":[]}'
             count='0'
           fi
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   plan:
     if: needs.resolve-targets.outputs.same_repo == 'true' && needs.resolve-targets.outputs.count != '0'
@@ -79,21 +81,23 @@ jobs:
       - name: Resolve Inputs
         id: resolve_inputs
         run: |
-          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
-          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
-          echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")" >> "${GITHUB_OUTPUT}"
-          if [[ -f "${{ matrix.backend_config_file }}" ]]; then
-            echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")" >> "${GITHUB_OUTPUT}"
-          else
-            echo "backend_cfg_abs=" >> "${GITHUB_OUTPUT}"
-          fi
-          echo "backend_key=${{ matrix.backend_key }}" >> "${GITHUB_OUTPUT}"
-          echo "backend_region=${{ matrix.backend_region }}" >> "${GITHUB_OUTPUT}"
-          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
-          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
-          echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "path=${{ matrix.path }}"
+            echo "slug=${{ matrix.slug }}"
+            echo "label=${{ matrix.label }}"
+            echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")"
+            if [[ -f "${{ matrix.backend_config_file }}" ]]; then
+              echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
+            else
+              echo "backend_cfg_abs="
+            fi
+            echo "backend_key=${{ matrix.backend_key }}"
+            echo "backend_region=${{ matrix.backend_region }}"
+            echo "aws_region=${{ matrix.aws_region }}"
+            echo "role_env_var=${{ matrix.role_env_var }}"
+            echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}"
+            echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Configure AWS Credentials
         uses: ./.github/actions/configure-aws-credentials
