@@ -56,8 +56,10 @@ jobs:
             matrix='{"include":[]}'
             count='0'
           fi
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   plan:
     if: needs.resolve-targets.outputs.same_repo == 'true' && needs.resolve-targets.outputs.count != '0'
@@ -79,23 +81,57 @@ jobs:
       - name: Resolve Inputs
         id: resolve_inputs
         run: |
-          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
-          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
-          echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")" >> "${GITHUB_OUTPUT}"
-          if [[ -f "${{ matrix.backend_config_file }}" ]]; then
-            echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")" >> "${GITHUB_OUTPUT}"
-          else
-            echo "backend_cfg_abs=" >> "${GITHUB_OUTPUT}"
+          {
+            echo "path=${{ matrix.path }}"
+            echo "slug=${{ matrix.slug }}"
+            echo "label=${{ matrix.label }}"
+            echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")"
+            if [[ -f "${{ matrix.backend_config_file }}" ]]; then
+              echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
+            else
+              echo "backend_cfg_abs="
+            fi
+            echo "backend_key=${{ matrix.backend_key }}"
+            echo "backend_region=${{ matrix.backend_region }}"
+            echo "aws_region=${{ matrix.aws_region }}"
+            echo "role_env_var=${{ matrix.role_env_var }}"
+            echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}"
+            echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check Speculative Plan Prerequisites
+        id: plan_prereqs
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+          TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+        run: |
+          role_env_var="${{ steps.resolve_inputs.outputs.role_env_var }}"
+          role_arn="$(printenv "${role_env_var}" || true)"
+
+          if [[ -z "${role_arn}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing AWS role secret for ${{ steps.resolve_inputs.outputs.label }}"
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
           fi
-          echo "backend_key=${{ matrix.backend_key }}" >> "${GITHUB_OUTPUT}"
-          echo "backend_region=${{ matrix.backend_region }}" >> "${GITHUB_OUTPUT}"
-          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
-          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
-          echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+
+          if [[ -z "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" && -z "${TF_BACKEND_BUCKET}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing TF_BACKEND_BUCKET repo variable"
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "skip=false"
+            echo "reason="
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Configure AWS Credentials
+        if: steps.plan_prereqs.outputs.skip != 'true'
         uses: ./.github/actions/configure-aws-credentials
         with:
           role_env_var: ${{ steps.resolve_inputs.outputs.role_env_var }}
@@ -122,6 +158,21 @@ jobs:
             echo "# Terraform speculative plan for ${{ steps.resolve_inputs.outputs.label }}"
             echo
           } > "${plan_txt}"
+
+          if [[ "${{ steps.plan_prereqs.outputs.skip }}" == "true" ]]; then
+            echo "${{ steps.plan_prereqs.outputs.reason }}" >> "${plan_txt}"
+            python3 .scripts/write_json_result.py \
+              --output "${result_json}" \
+              --set label "${{ steps.resolve_inputs.outputs.label }}" \
+              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+              --set status "skipped" \
+              --set-nullable-int add "null" \
+              --set-nullable-int change "null" \
+              --set-nullable-int destroy "null" \
+              --set plan_artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}" \
+              --set result_artifact_name "${{ steps.resolve_inputs.outputs.result_artifact_name }}"
+            exit 0
+          fi
 
           init_args=()
           if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
@@ -245,3 +296,28 @@ jobs:
             --body-file pr-comment.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  plan-status:
+    name: Plan Terraform Changes
+    if: always()
+    needs:
+      - resolve-targets
+      - plan
+      - comment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate plan workflow result
+        run: |
+          python3 - <<'PY'
+          import json
+
+          needs = json.loads(r'''${{ toJson(needs) }}''')
+          failures = {
+              name: data["result"]
+              for name, data in needs.items()
+              if data["result"] not in ("success", "skipped")
+          }
+          if failures:
+              raise SystemExit(f"Plan workflow failures: {failures}")
+          print("Plan workflow passed.")
+          PY
