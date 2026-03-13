@@ -17,10 +17,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Detect supported package manifests
+        id: manifests
+        run: |
+          if git ls-files | grep -Eq '(^|/)(package-lock\.json|package\.json|requirements\.txt|poetry\.lock|Pipfile\.lock|pom\.xml|build\.gradle(\.kts)?|go\.mod|go\.sum|Cargo\.lock|Gemfile\.lock|composer\.lock|packages\.lock\.json|pnpm-lock\.yaml|yarn\.lock)$'; then
+            echo "supported=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "supported=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Review changes to repository supply chain
+        if: steps.manifests.outputs.supported == 'true'
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: critical
+
+      - name: Skip dependency review
+        if: steps.manifests.outputs.supported != 'true'
+        run: echo "No supported package manifests or lockfiles found; skipping dependency review."
 
   dependency-review-push:
     if: github.event_name == 'push'
@@ -31,9 +45,23 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Detect supported package manifests
+        id: manifests
+        run: |
+          if git ls-files | grep -Eq '(^|/)(package-lock\.json|package\.json|requirements\.txt|poetry\.lock|Pipfile\.lock|pom\.xml|build\.gradle(\.kts)?|go\.mod|go\.sum|Cargo\.lock|Gemfile\.lock|composer\.lock|packages\.lock\.json|pnpm-lock\.yaml|yarn\.lock)$'; then
+            echo "supported=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "supported=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Review changes to repository supply chain
+        if: steps.manifests.outputs.supported == 'true'
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: critical
           base-ref: refs/heads/main~1
           head-ref: refs/heads/main
+
+      - name: Skip dependency review
+        if: steps.manifests.outputs.supported != 'true'
+        run: echo "No supported package manifests or lockfiles found; skipping dependency review."
