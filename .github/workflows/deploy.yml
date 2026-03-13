@@ -86,8 +86,10 @@ jobs:
             matrix="$(python3 .scripts/terraform_target_matrix.py --mode changed --base-sha "${{ github.event.before }}" --head-sha "${{ github.sha }}" --output-format json)"
             count="$(python3 .scripts/terraform_target_matrix.py --mode changed --base-sha "${{ github.event.before }}" --head-sha "${{ github.sha }}" --output-format count)"
           fi
-          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
 
   plan:
     if: needs.resolve-targets.outputs.count != '0'
@@ -109,23 +111,25 @@ jobs:
       - name: Resolve Inputs
         id: resolve_inputs
         run: |
-          echo "path=${{ matrix.path }}" >> "${GITHUB_OUTPUT}"
-          echo "slug=${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "label=${{ matrix.label }}" >> "${GITHUB_OUTPUT}"
-          echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")" >> "${GITHUB_OUTPUT}"
-          if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
-            echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")" >> "${GITHUB_OUTPUT}"
-          else
-            echo "backend_cfg_abs=" >> "${GITHUB_OUTPUT}"
-          fi
-          echo "backend_key=${{ matrix.backend_key }}" >> "${GITHUB_OUTPUT}"
-          echo "backend_region=${{ matrix.backend_region }}" >> "${GITHUB_OUTPUT}"
-          echo "aws_region=${{ matrix.aws_region }}" >> "${GITHUB_OUTPUT}"
-          echo "role_env_var=${{ matrix.role_env_var }}" >> "${GITHUB_OUTPUT}"
-          echo "deploy_environment=${{ matrix.deploy_environment }}" >> "${GITHUB_OUTPUT}"
-          echo "plan_artifact_name=terraform-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "result_artifact_name=terraform-plan-result-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
-          echo "trivy_plan_artifact_name=trivy-plan-${{ matrix.slug }}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "path=${{ matrix.path }}"
+            echo "slug=${{ matrix.slug }}"
+            echo "label=${{ matrix.label }}"
+            echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")"
+            if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
+              echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
+            else
+              echo "backend_cfg_abs="
+            fi
+            echo "backend_key=${{ matrix.backend_key }}"
+            echo "backend_region=${{ matrix.backend_region }}"
+            echo "aws_region=${{ matrix.aws_region }}"
+            echo "role_env_var=${{ matrix.role_env_var }}"
+            echo "deploy_environment=${{ matrix.deploy_environment }}"
+            echo "plan_artifact_name=terraform-plan-${{ matrix.slug }}"
+            echo "result_artifact_name=terraform-plan-result-${{ matrix.slug }}"
+            echo "trivy_plan_artifact_name=trivy-plan-${{ matrix.slug }}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Configure AWS Credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -255,7 +259,7 @@ jobs:
 
       - name: Upload Saved Plan Artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ steps.resolve_inputs.outputs.plan_artifact_name }}
           retention-days: 30
@@ -268,7 +272,7 @@ jobs:
 
       - name: Upload Trivy Plan Artifact
         if: always() && vars.ENABLE_TRIVY_PLAN != 'false'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ steps.resolve_inputs.outputs.trivy_plan_artifact_name }}
           retention-days: 30
@@ -277,7 +281,7 @@ jobs:
 
       - name: Upload Plan Result Artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ steps.resolve_inputs.outputs.result_artifact_name }}
           retention-days: 30
@@ -294,8 +298,11 @@ jobs:
       apply_matrix: ${{ steps.collect.outputs.apply_matrix }}
       apply_count: ${{ steps.collect.outputs.apply_count }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
       - name: Download Plan Result Artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: terraform-plan-result-*
           merge-multiple: true
@@ -339,7 +346,7 @@ jobs:
           aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
 
       - name: Download Saved Plan Artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ runner.temp }}/downloaded-plan-${{ matrix.slug }}
