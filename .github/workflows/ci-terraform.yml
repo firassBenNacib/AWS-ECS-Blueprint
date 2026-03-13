@@ -175,9 +175,11 @@ jobs:
 
       - name: Install tfsec
         run: |
-          curl -sSfL "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64" \
-            -o /usr/local/bin/tfsec
-          chmod +x /usr/local/bin/tfsec
+          tmp_bin="$(mktemp)"
+          curl --retry 5 --retry-delay 2 --retry-all-errors -sSfL \
+            "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64" \
+            -o "${tmp_bin}"
+          install -m 0755 "${tmp_bin}" /usr/local/bin/tfsec
 
       - name: Run tfsec policy gate
         run: bash .scripts/run_tfsec_gate.sh "${{ matrix.tfvars_file }}" "${{ matrix.path }}"
