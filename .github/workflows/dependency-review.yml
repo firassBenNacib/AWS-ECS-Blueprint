@@ -65,3 +65,27 @@ jobs:
       - name: Skip dependency review
         if: steps.manifests.outputs.supported != 'true'
         run: echo "No supported package manifests or lockfiles found; skipping dependency review."
+
+  dependabot-scan-status:
+    name: Dependabot Scan
+    if: always()
+    needs:
+      - dependency-review-pr
+      - dependency-review-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate dependency review result
+        run: |
+          python3 - <<'PY'
+          import json
+
+          needs = json.loads(r'''${{ toJson(needs) }}''')
+          failures = {
+              name: data["result"]
+              for name, data in needs.items()
+              if data["result"] not in ("success", "skipped")
+          }
+          if failures:
+              raise SystemExit(f"Dependency review failures: {failures}")
+          print("Dependency review workflow passed.")
+          PY

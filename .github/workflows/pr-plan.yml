@@ -296,3 +296,28 @@ jobs:
             --body-file pr-comment.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  plan-status:
+    name: Plan Terraform Changes
+    if: always()
+    needs:
+      - resolve-targets
+      - plan
+      - comment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate plan workflow result
+        run: |
+          python3 - <<'PY'
+          import json
+
+          needs = json.loads(r'''${{ toJson(needs) }}''')
+          failures = {
+              name: data["result"]
+              for name, data in needs.items()
+              if data["result"] not in ("success", "skipped")
+          }
+          if failures:
+              raise SystemExit(f"Plan workflow failures: {failures}")
+          print("Plan workflow passed.")
+          PY

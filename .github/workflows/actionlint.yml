@@ -22,3 +22,17 @@ jobs:
 
       - name: Run actionlint
         uses: ./.github/actions/actionlint
+
+  lint-status:
+    name: Lint GitHub Actions
+    if: always()
+    needs:
+      - actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate actionlint result
+        run: |
+          if [[ "${{ needs.actionlint.result }}" != "success" && "${{ needs.actionlint.result }}" != "skipped" ]]; then
+            echo "actionlint result: ${{ needs.actionlint.result }}" >&2
+            exit 1
+          fi
