@@ -183,4 +183,4 @@ jobs:
           if [[ "${{ inputs.cleanup_secrets }}" == "true" ]]; then
             args+=(--cleanup-secrets)
           fi
-          ./.scripts/safe_destroy_app_root.sh "${args[@]}"
+          bash ./.scripts/safe_destroy_app_root.sh "${args[@]}"

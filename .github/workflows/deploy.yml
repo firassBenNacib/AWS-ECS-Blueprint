@@ -411,7 +411,7 @@ jobs:
             --github-output "${GITHUB_OUTPUT}"
 
   apply:
-    if: always() && needs.collect-plan-results.outputs.apply_count != '0' && (github.event_name == 'push' || github.event.inputs.apply_after_plan == 'true')
+    if: always() && needs.collect-plan-results.outputs.apply_count != '0' && (github.event_name == 'push' || github.event.inputs.apply_after_plan == 'true' || github.event.inputs.apply_after_plan == true)
     needs:
       - resolve-targets
       - plan
