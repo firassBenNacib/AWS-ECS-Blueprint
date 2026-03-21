@@ -63,6 +63,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   plan:
+    name: plan (${{ matrix.label }})
     if: needs.resolve-targets.outputs.same_repo == 'true' && needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets

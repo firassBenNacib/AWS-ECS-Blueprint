@@ -1,19 +1,6 @@
 name: Deploy Terraform
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "modules/**"
-      - "prod-app/**"
-      - "nonprod-app/**"
-      - "*.tf"
-      - "*.tfvars"
-      - "*.tfvars.example"
-      - "*.hcl"
-      - "*.hcl.example"
-      - ".terraform.lock.hcl"
   workflow_dispatch:
     inputs:
       target:
@@ -88,6 +75,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   plan:
+    name: plan (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -411,7 +399,8 @@ jobs:
             --github-output "${GITHUB_OUTPUT}"
 
   apply:
-    if: always() && needs.collect-plan-results.outputs.apply_count != '0' && (github.event_name == 'push' || github.event.inputs.apply_after_plan == 'true' || github.event.inputs.apply_after_plan == true)
+    name: apply (${{ matrix.label }})
+    if: always() && needs.collect-plan-results.outputs.apply_count != '0' && (github.event.inputs.apply_after_plan == 'true' || github.event.inputs.apply_after_plan == true)
     needs:
       - resolve-targets
       - plan

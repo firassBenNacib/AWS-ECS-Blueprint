@@ -6,11 +6,10 @@ on:
       target:
         description: "Deployment root to validate"
         required: true
-        default: "nonprod-app"
+        default: "prod-app"
         type: choice
         options:
           - prod-app
-          - nonprod-app
   schedule:
     - cron: "0 3 * * *"
 
@@ -49,6 +48,7 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   validate:
+    name: validate (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
