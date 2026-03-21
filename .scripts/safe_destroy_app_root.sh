@@ -134,6 +134,68 @@ state_list_matching() {
   terraform -chdir="${ROOT_DIR}" state list | grep -E "${pattern}" || true
 }
 
+backup_vault_region() {
+  local address="$1"
+  local arn
+  arn="$(state_value "${address}" arn)"
+  if [[ -z "${arn}" ]]; then
+    terraform -chdir="${ROOT_DIR}" state show -no-color "${address}" | sed -n 's/^    arn *= *"\(.*\)"/\1/p' | head -n 1
+    return 0
+  fi
+  printf '%s\n' "${arn}" | cut -d: -f4
+}
+
+purge_backup_vault_recovery_points() {
+  mapfile -t vault_addresses < <(state_list_matching 'aws_backup_vault\.')
+  [[ ${#vault_addresses[@]} -eq 0 ]] && return 0
+
+  for address in "${vault_addresses[@]}"; do
+    local vault_name region
+    vault_name="$(state_value "${address}" name)"
+    region="$(backup_vault_region "${address}")"
+    [[ -z "${vault_name}" || -z "${region}" ]] && continue
+
+    echo "Purging recovery points from backup vault ${vault_name} in ${region}"
+    python3 - "${vault_name}" "${region}" <<'PY'
+import json
+import subprocess
+import sys
+
+vault_name, region = sys.argv[1], sys.argv[2]
+next_token = None
+
+while True:
+    cmd = [
+        "aws", "backup", "list-recovery-points-by-backup-vault",
+        "--backup-vault-name", vault_name,
+        "--region", region,
+        "--output", "json",
+    ]
+    if next_token:
+        cmd.extend(["--starting-token", next_token])
+
+    payload = json.loads(subprocess.check_output(cmd, text=True))
+    for item in payload.get("RecoveryPoints", []):
+        recovery_point_arn = item["RecoveryPointArn"]
+        print(f"Deleting recovery point {recovery_point_arn}")
+        subprocess.check_call(
+            [
+                "aws", "backup", "delete-recovery-point",
+                "--backup-vault-name", vault_name,
+                "--region", region,
+                "--recovery-point-arn", recovery_point_arn,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    next_token = payload.get("NextToken")
+    if not next_token:
+        break
+PY
+  done
+}
+
 disable_alb_deletion_protection() {
   local alb_address
   alb_address="$(state_list_matching 'aws_lb\.this$' | head -n 1)"
@@ -283,6 +345,7 @@ cleanup_secrets() {
 disable_alb_deletion_protection
 disable_rds_deletion_protection
 empty_managed_buckets
+purge_backup_vault_recovery_points
 
 terraform -chdir="${ROOT_DIR}" destroy \
   -auto-approve \

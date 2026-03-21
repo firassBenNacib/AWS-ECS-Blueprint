@@ -59,6 +59,7 @@ No modules.
 | public_app_subnet_cidrs | CIDR blocks for public edge subnets (ALB/NAT) | `list(string)` | n/a | yes |
 | vpc_cidr | CIDR block for the VPC | `string` | n/a | yes |
 | flow_logs_kms_key_id | KMS key ARN used to encrypt VPC Flow Logs CloudWatch log group | `string` | `null` | no |
+| flow_logs_name_prefix | Prefix used for VPC Flow Logs IAM and CloudWatch log-group names. Defaults to vpc_name when unset. | `string` | `null` | no |
 | flow_logs_retention_days | Retention days for the VPC Flow Logs CloudWatch log group | `number` | `365` | no |
 | interface_endpoint_services | AWS service short names used to create Interface VPC Endpoints for private Fargate runtime dependencies. | `list(string)` | <pre>[<br/>  "ecr.api",<br/>  "ecr.dkr",<br/>  "logs",<br/>  "sts",<br/>  "secretsmanager",<br/>  "kms"<br/>]</pre> | no |
 | lockdown_default_security_group | When true, removes all rules from the default security group for this VPC | `bool` | `true` | no |

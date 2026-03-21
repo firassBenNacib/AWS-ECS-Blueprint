@@ -18,6 +18,9 @@ locals {
   nat_gateway_count = var.private_app_nat_mode == "required" ? length(var.availability_zones) : (
     var.private_app_nat_mode == "canary" && length(var.availability_zones) > 0 ? 1 : 0
   )
+  flow_logs_name_prefix = (
+    var.flow_logs_name_prefix != null && trimspace(var.flow_logs_name_prefix) != ""
+  ) ? trimspace(var.flow_logs_name_prefix) : var.vpc_name
 
   private_app_nat_routes = var.private_app_nat_mode == "required" ? {
     for idx in range(length(var.availability_zones)) : tostring(idx) => idx
@@ -50,18 +53,18 @@ data "aws_iam_policy_document" "vpc_flow_logs_assume_role" {
 }
 
 resource "aws_iam_role" "vpc_flow_logs" {
-  name               = "${var.vpc_name}-flow-logs-role"
+  name               = "${local.flow_logs_name_prefix}-flow-logs-role"
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_logs_assume_role.json
 }
 
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/${var.vpc_name}/flow-logs"
+  name              = "/aws/vpc/${local.flow_logs_name_prefix}/flow-logs"
   retention_in_days = var.flow_logs_retention_days
   kms_key_id        = var.flow_logs_kms_key_id
 }
 
 resource "aws_iam_role_policy" "vpc_flow_logs" {
-  name = "${var.vpc_name}-flow-logs-policy"
+  name = "${local.flow_logs_name_prefix}-flow-logs-policy"
   role = aws_iam_role.vpc_flow_logs.id
 
   #tfsec:ignore:aws-iam-no-policy-wildcards CloudWatch Logs stream ARNs require wildcard suffixes and cannot be enumerated ahead of time.

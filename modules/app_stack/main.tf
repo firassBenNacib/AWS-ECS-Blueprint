@@ -1276,6 +1276,7 @@ module "network" {
   private_db_subnet_cidrs         = var.private_db_subnet_cidrs
   flow_logs_retention_days        = var.vpc_flow_logs_retention_days
   flow_logs_kms_key_id            = local.vpc_flow_logs_kms_key_arn
+  flow_logs_name_prefix           = "${var.vpc_name}-${local.environment_name}"
   lockdown_default_security_group = var.lockdown_default_security_group
   interface_endpoint_services     = var.interface_endpoint_services
   private_app_nat_mode            = var.private_app_nat_mode
