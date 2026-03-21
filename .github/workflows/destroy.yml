@@ -119,8 +119,8 @@ jobs:
         run: |
           expected="destroy ${{ inputs.target }}"
           confirmation="${{ inputs.confirmation }}"
-          confirmation="${confirmation#"${confirmation%%[![:space:]]*}"}"
-          confirmation="${confirmation%"${confirmation##*[![:space:]]}"}"
+          read -r -a confirmation_parts <<< "${confirmation}"
+          confirmation="${confirmation_parts[*]}"
           if [[ "${confirmation}" != "${expected}" ]]; then
             echo "::error::Confirmation mismatch. Type exactly '${expected}'."
             exit 1
