@@ -118,7 +118,10 @@ jobs:
       - name: Require explicit confirmation
         run: |
           expected="destroy ${{ inputs.target }}"
-          if [[ "${{ inputs.confirmation }}" != "${expected}" ]]; then
+          confirmation="${{ inputs.confirmation }}"
+          confirmation="${confirmation#"${confirmation%%[![:space:]]*}"}"
+          confirmation="${confirmation%"${confirmation##*[![:space:]]}"}"
+          if [[ "${confirmation}" != "${expected}" ]]; then
             echo "::error::Confirmation mismatch. Type exactly '${expected}'."
             exit 1
           fi
