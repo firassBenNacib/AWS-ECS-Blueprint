@@ -79,6 +79,7 @@ jobs:
         run: terraform fmt -check -recursive
 
   terraform-validate:
+    name: terraform-validate (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -100,6 +101,7 @@ jobs:
         run: terraform -chdir="${{ matrix.path }}" validate
 
   tflint:
+    name: tflint (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -129,6 +131,7 @@ jobs:
         run: tflint --chdir="${{ matrix.path }}" --format compact
 
   checkov-policy:
+    name: checkov-policy (${{ matrix.label }})
     if: vars.ENABLE_CHECKOV != 'false' && needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -162,6 +165,7 @@ jobs:
           path: security-reports/checkov-${{ matrix.slug }}/
 
   tfsec-policy:
+    name: tfsec-policy (${{ matrix.label }})
     if: vars.ENABLE_TFSEC != 'false' && needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
