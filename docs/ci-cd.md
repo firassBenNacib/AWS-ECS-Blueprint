@@ -31,7 +31,7 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Applies the exact saved plan only after GitHub Environment approval.
 - `live-validation.yml`
   - Runs nightly for scheduled validation targets and on demand for selected deployment roots.
-  - Uses isolated local workspaces, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
+  - Uses isolated local Terraform state, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
   - Expects dedicated live-validation tfvars secrets for each enabled target.
 
 ## Shared Actions
@@ -63,7 +63,7 @@ Backend configuration for saved-plan workflows:
 - `TF_BACKEND_BUCKET`
 - `TF_BACKEND_REGION`
 
-The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates in an isolated local workspace and destroys in the same job.
+The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates against isolated local state and destroys in the same job.
 
 ## Secrets
 

@@ -50,9 +50,10 @@ done
 mkdir -p "${LOG_DIR}"
 
 initialized=0
-workspace_ready=0
 main_status=0
 destroy_status=0
+tf_data_dir="${LOG_DIR}/tfdata"
+state_file="${LOG_DIR}/terraform.tfstate"
 
 cleanup() {
   local exit_code=$?
@@ -63,14 +64,15 @@ cleanup() {
   fi
 
   if [[ "${initialized}" -eq 1 ]]; then
-    terraform -chdir="${PATH_ARG}" init -backend=false > "${LOG_DIR}/destroy-init.log" 2>&1 || true
+    TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" init -backend=false -reconfigure > "${LOG_DIR}/destroy-init.log" 2>&1 || true
 
-    if [[ "${workspace_ready}" -eq 1 ]]; then
-      terraform -chdir="${PATH_ARG}" workspace select "${WORKSPACE}" > "${LOG_DIR}/destroy-workspace.log" 2>&1 || true
-      terraform -chdir="${PATH_ARG}" destroy -auto-approve -input=false -var-file="${TFVARS_FILE}" > "${LOG_DIR}/destroy.log" 2>&1
+    if [[ -f "${state_file}" ]]; then
+      TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" destroy \
+        -auto-approve \
+        -input=false \
+        -state="${state_file}" \
+        -var-file="${TFVARS_FILE}" > "${LOG_DIR}/destroy.log" 2>&1
       destroy_status=$?
-      terraform -chdir="${PATH_ARG}" workspace select default >> "${LOG_DIR}/destroy-workspace.log" 2>&1 || true
-      terraform -chdir="${PATH_ARG}" workspace delete -force "${WORKSPACE}" >> "${LOG_DIR}/destroy-workspace.log" 2>&1 || true
     fi
   fi
 
@@ -82,17 +84,19 @@ cleanup() {
 
 trap cleanup EXIT
 
-terraform -chdir="${PATH_ARG}" init -backend=false > "${LOG_DIR}/init.log" 2>&1
+TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" init -backend=false -reconfigure > "${LOG_DIR}/init.log" 2>&1
 initialized=1
 
-if ! terraform -chdir="${PATH_ARG}" workspace select "${WORKSPACE}" > "${LOG_DIR}/workspace.log" 2>&1; then
-  terraform -chdir="${PATH_ARG}" workspace new "${WORKSPACE}" >> "${LOG_DIR}/workspace.log" 2>&1
-fi
-workspace_ready=1
+echo "Using isolated local state at ${state_file}" > "${LOG_DIR}/workspace.log"
 
-terraform -chdir="${PATH_ARG}" apply -auto-approve -input=false -var-file="${TFVARS_FILE}" > "${LOG_DIR}/apply.log" 2>&1
+TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" apply \
+  -auto-approve \
+  -input=false \
+  -state="${state_file}" \
+  -var-file="${TFVARS_FILE}" > "${LOG_DIR}/apply.log" 2>&1
 bash .scripts/run_live_validation_checks.sh \
   --path "${PATH_ARG}" \
+  --state-file "${state_file}" \
   --aws-region "${AWS_REGION}" \
   --smoke-profile "${SMOKE_PROFILE}" > "${LOG_DIR}/smoke.log" 2>&1
 
