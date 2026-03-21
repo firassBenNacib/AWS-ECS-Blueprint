@@ -1453,6 +1453,14 @@ resource "aws_security_group" "microservices_internal" {
   }
 
   egress {
+    description = "Allow internal service-to-service traffic"
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    self        = true
+  }
+
+  egress {
     description = "Allow DNS over UDP to the VPC resolver"
     from_port   = 53
     to_port     = 53
@@ -2183,6 +2191,93 @@ resource "aws_s3_bucket_logging" "cloudfront_logs_dr" {
   depends_on = [aws_s3_bucket_policy.s3_access_logs_dr_bucket]
 }
 
+resource "aws_cloudfront_response_headers_policy" "secure_defaults" {
+  name    = "${var.project_name}-${local.environment_name}-secure-headers"
+  comment = "Security headers for the ${local.environment_name} CloudFront distribution."
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = "default-src 'self'; base-uri 'self'; connect-src 'self' https:; font-src 'self' data: https:; frame-ancestors 'self'; img-src 'self' data: https:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests"
+      override                = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "SAMEORIGIN"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+
+    xss_protection {
+      mode_block = true
+      protection = true
+      override   = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = "camera=(), geolocation=(), microphone=()"
+      override = true
+    }
+
+    items {
+      header   = "Cross-Origin-Embedder-Policy"
+      value    = "unsafe-none"
+      override = true
+    }
+
+    items {
+      header   = "Cross-Origin-Opener-Policy"
+      value    = "same-origin-allow-popups"
+      override = true
+    }
+
+    items {
+      header   = "Cross-Origin-Resource-Policy"
+      value    = "same-site"
+      override = true
+    }
+  }
+
+  remove_headers_config {
+    items {
+      header = "Server"
+    }
+
+    items {
+      header = "X-Amz-Replication-Status"
+    }
+
+    items {
+      header = "X-Amz-Server-Side-Encryption"
+    }
+
+    items {
+      header = "X-Amz-Server-Side-Encryption-Aws-Kms-Key-Id"
+    }
+
+    items {
+      header = "X-Amz-Version-Id"
+    }
+  }
+}
+
 module "cloudfront_frontend" {
   source = "../cloudfront_frontend"
 
@@ -2192,7 +2287,7 @@ module "cloudfront_frontend" {
   frontend_cert_arn          = var.acm_cert_frontend
   cache_policy_id            = var.frontend_cache_policy_id
   price_class                = var.frontend_price_class
-  response_headers_policy_id = var.frontend_response_headers_policy_id
+  response_headers_policy_id = aws_cloudfront_response_headers_policy.secure_defaults.id
   viewer_protocol_policy     = var.frontend_viewer_protocol_policy
   geo_restriction_type       = var.frontend_geo_restriction_type
   geo_locations              = var.frontend_geo_locations
@@ -2215,7 +2310,7 @@ module "cloudfront_frontend" {
   backend_viewer_protocol_policy            = var.backend_viewer_protocol_policy
   backend_cache_policy_id                   = var.backend_cache_policy_id
   backend_origin_request_policy_id          = var.backend_origin_request_policy_id
-  backend_response_headers_policy_id        = var.backend_response_headers_policy_id
+  backend_response_headers_policy_id        = aws_cloudfront_response_headers_policy.secure_defaults.id
   backend_allowed_methods                   = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
   backend_path_patterns                     = local.backend_path_patterns
   backend_origin_auth_enabled               = var.enable_origin_auth_header
