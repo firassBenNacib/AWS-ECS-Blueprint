@@ -59,7 +59,7 @@ jobs:
           echo "Configure dedicated validation-only DNS names, ACM certificates, and LIVE_VALIDATION_TFVARS_* secrets before re-enabling this workflow."
 
   validate:
-    name: validate (${{ matrix.label }})
+    name: validate
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
