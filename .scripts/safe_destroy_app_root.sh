@@ -50,7 +50,11 @@ if [[ -z "${ROOT_DIR}" ]]; then
 fi
 
 ROOT_DIR="$(cd "${ROOT_DIR}" && pwd)"
-TFVARS_PATH="${ROOT_DIR}/${TFVARS_FILE}"
+if [[ "${TFVARS_FILE}" = /* ]]; then
+  TFVARS_PATH="${TFVARS_FILE}"
+else
+  TFVARS_PATH="${ROOT_DIR}/${TFVARS_FILE}"
+fi
 
 if [[ ! -f "${TFVARS_PATH}" ]]; then
   echo "tfvars file not found: ${TFVARS_PATH}" >&2

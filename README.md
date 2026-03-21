@@ -139,6 +139,7 @@ The repository uses a focused workflow set under [`.github/workflows/`](./.githu
 - `dependency-review.yml`: dependency and supply-chain review on pull requests
 - `pr-plan.yml`: speculative Terraform plans for pull requests
 - `deploy.yml`: saved-plan deployment flow with GitHub environment approval
+- `destroy.yml`: manual destroy flow with typed confirmation and GitHub environment approval
 - `live-validation.yml`: scheduled or manual apply/smoke/destroy validation runs
 - `terraform-docs.yml`: module documentation drift checks
 - `allowlist-expiry.yml`: allowlist governance checks
@@ -153,8 +154,17 @@ Secrets used by the GitHub OIDC deployment path:
 
 - `AWS_ROLE_ARN_PROD_APP`
 - `AWS_ROLE_ARN_NONPROD_APP`
+- `TFVARS_PROD_APP`
+- `TFVARS_NONPROD_APP`
 
 Live validation also uses per-root tfvars secrets, documented in [`docs/ci-cd.md`](./docs/ci-cd.md).
+
+Protected GitHub environments should exist for:
+
+- `prod-app`
+- `nonprod-app`
+- `prod-app-destroy`
+- `nonprod-app-destroy`
 
 ## License
 
