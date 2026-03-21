@@ -41,6 +41,7 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Uses isolated local Terraform state, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
   - Expects dedicated live-validation tfvars secrets for each enabled target.
   - Keep a target disabled until it has dedicated validation-only DNS and ACM certificates; do not point live validation at the exact hostnames used by a live environment.
+  - The repository currently keeps both app roots disabled for live validation because there are no dedicated validation-only DNS names and ACM certificates configured yet.
 
 ## Shared Actions
 
