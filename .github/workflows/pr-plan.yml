@@ -126,7 +126,7 @@ jobs:
             echo "backend_region=${{ matrix.backend_region }}"
             echo "aws_region=${{ matrix.aws_region }}"
             echo "role_env_var=${{ matrix.role_env_var }}"
-            echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}"
+            echo "plan_artifact_name=terraform-pr-summary-${{ matrix.slug }}"
             echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}"
           } >> "${GITHUB_OUTPUT}"
 
@@ -177,6 +177,7 @@ jobs:
           artifact_dir="${RUNNER_TEMP}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}"
           mkdir -p "${artifact_dir}"
           plan_txt="${artifact_dir}/tfplan.txt"
+          summary_txt="${artifact_dir}/summary.txt"
           result_json="${artifact_dir}/result.json"
           status="error"
           add="null"
@@ -185,14 +186,18 @@ jobs:
           exit_code=1
 
           {
-            echo "# Terraform speculative plan for ${{ steps.resolve_inputs.outputs.label }}"
+            echo "# Terraform speculative plan summary for ${{ steps.resolve_inputs.outputs.label }}"
             echo
             echo "tfvars source: ${{ steps.resolve_inputs.outputs.tfvars_source }}"
             echo
-          } > "${plan_txt}"
+          } > "${summary_txt}"
+          : > "${plan_txt}"
 
           if [[ "${{ steps.plan_prereqs.outputs.skip }}" == "true" ]]; then
-            echo "${{ steps.plan_prereqs.outputs.reason }}" >> "${plan_txt}"
+            {
+              echo "status: skipped"
+              echo "reason: ${{ steps.plan_prereqs.outputs.reason }}"
+            } >> "${summary_txt}"
             status="skipped"
             exit_code=0
             python3 .scripts/write_json_result.py \
@@ -240,6 +245,16 @@ jobs:
             fi
           fi
 
+          {
+            echo "status: ${status}"
+            echo "add: ${add}"
+            echo "change: ${change}"
+            echo "destroy: ${destroy}"
+            if [[ "${status}" == "error" ]]; then
+              echo "details: Full Terraform output is intentionally not uploaded for this public repository. Use the workflow logs for diagnostics."
+            fi
+          } >> "${summary_txt}"
+
           python3 .scripts/write_json_result.py \
             --output "${result_json}" \
             --set label "${{ steps.resolve_inputs.outputs.label }}" \
@@ -261,7 +276,7 @@ jobs:
         with:
           name: ${{ steps.resolve_inputs.outputs.plan_artifact_name }}
           retention-days: 14
-          path: ${{ runner.temp }}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}/tfplan.txt
+          path: ${{ runner.temp }}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}/summary.txt
           if-no-files-found: ignore
 
       - name: Upload PR Result Artifact
