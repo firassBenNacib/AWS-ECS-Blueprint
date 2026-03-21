@@ -1600,6 +1600,12 @@ resource "aws_service_discovery_service" "microservices" {
   }
 
   health_check_custom_config {}
+
+  lifecycle {
+    ignore_changes = [
+      health_check_custom_config
+    ]
+  }
 }
 
 module "alb" {

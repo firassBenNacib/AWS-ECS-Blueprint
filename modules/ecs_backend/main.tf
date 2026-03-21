@@ -53,11 +53,15 @@ locals {
       user                   = var.container_user
       linuxParameters = {
         capabilities = {
+          add  = []
           drop = var.drop_capabilities
         }
       }
-      environment = local.container_environment
-      secrets     = local.container_secrets
+      environment    = local.container_environment
+      mountPoints    = []
+      secrets        = local.container_secrets
+      systemControls = []
+      volumesFrom    = []
     }
   ]
 }

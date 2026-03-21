@@ -60,16 +60,11 @@ locals {
       readonlyRootFilesystem = var.readonly_root_fs
       linuxParameters = {
         capabilities = {
+          add  = []
           drop = var.drop_capabilities
         }
       }
       environment = local.container_environment
-      secrets     = local.container_secrets
-    },
-    var.container_user != null && trimspace(var.container_user) != "" ? { user = var.container_user } : {},
-    length(var.entrypoint) > 0 ? { entryPoint = var.entrypoint } : {},
-    length(var.command) > 0 ? { command = var.command } : {},
-    length(var.mount_points) > 0 ? {
       mountPoints = [
         for mount_point in var.mount_points : {
           sourceVolume  = mount_point.source_volume
@@ -77,7 +72,13 @@ locals {
           readOnly      = coalesce(try(mount_point.read_only, null), false)
         }
       ]
-    } : {},
+      secrets        = local.container_secrets
+      systemControls = []
+      volumesFrom    = []
+    },
+    var.container_user != null && trimspace(var.container_user) != "" ? { user = var.container_user } : {},
+    length(var.entrypoint) > 0 ? { entryPoint = var.entrypoint } : {},
+    length(var.command) > 0 ? { command = var.command } : {},
     length(var.health_check_command) > 0 ? {
       healthCheck = {
         command     = var.health_check_command
@@ -212,7 +213,8 @@ resource "aws_ecs_task_definition" "this" {
       for volume in var.task_volumes : volume.name => volume
     }
     content {
-      name = volume.value.name
+      configure_at_launch = false
+      name                = volume.value.name
     }
   }
 }
