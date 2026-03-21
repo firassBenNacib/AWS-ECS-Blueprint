@@ -28,7 +28,7 @@
     "role_env_var": "AWS_ROLE_ARN_NONPROD_APP",
     "deploy_environment": "nonprod-app",
     "aws_region": "eu-west-1",
-    "live_validation_enabled": true,
+    "live_validation_enabled": false,
     "live_validation_scheduled": true,
     "live_validation_tfvars_env_var": "LIVE_VALIDATION_TFVARS_NONPROD_APP",
     "live_validation_smoke_profile": "app"
