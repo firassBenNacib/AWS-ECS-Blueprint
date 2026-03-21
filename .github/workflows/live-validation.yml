@@ -47,6 +47,17 @@ jobs:
             echo "count=${count}"
           } >> "${GITHUB_OUTPUT}"
 
+  report-no-targets:
+    if: needs.resolve-targets.outputs.count == '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report disabled live validation targets
+        run: |
+          echo "No live-validation targets are currently enabled."
+          echo "Configure dedicated validation-only DNS names, ACM certificates, and LIVE_VALIDATION_TFVARS_* secrets before re-enabling this workflow."
+
   validate:
     name: validate (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
