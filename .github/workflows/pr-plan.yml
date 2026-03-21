@@ -82,12 +82,41 @@ jobs:
 
       - name: Resolve Inputs
         id: resolve_inputs
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
         run: |
+          tfvars_abs=""
+          tfvars_source="repository"
+          case "${{ matrix.slug }}" in
+            prod-app)
+              if [[ -n "${TFVARS_PROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-prod-app.auto.tfvars"
+                printf '%s' "${TFVARS_PROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+                tfvars_source="secret"
+              fi
+              ;;
+            nonprod-app)
+              if [[ -n "${TFVARS_NONPROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-nonprod-app.auto.tfvars"
+                printf '%s' "${TFVARS_NONPROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+                tfvars_source="secret"
+              fi
+              ;;
+          esac
+
+          if [[ -z "${tfvars_abs}" ]]; then
+            tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
+          fi
+
           {
             echo "path=${{ matrix.path }}"
             echo "slug=${{ matrix.slug }}"
             echo "label=${{ matrix.label }}"
-            echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")"
+            echo "tfvars_abs=${tfvars_abs}"
+            echo "tfvars_source=${tfvars_source}"
             if [[ -f "${{ matrix.backend_config_file }}" ]]; then
               echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
             else
@@ -157,6 +186,8 @@ jobs:
 
           {
             echo "# Terraform speculative plan for ${{ steps.resolve_inputs.outputs.label }}"
+            echo
+            echo "tfvars source: ${{ steps.resolve_inputs.outputs.tfvars_source }}"
             echo
           } > "${plan_txt}"
 
