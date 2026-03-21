@@ -46,6 +46,7 @@ Shared application stack used by the `prod-app` and `nonprod-app` deployment roo
 
 | Name | Type |
 |------|------|
+| [aws_cloudfront_response_headers_policy.secure_defaults](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_response_headers_policy) | resource |
 | [aws_cloudfront_vpc_origin.backend_primary](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_vpc_origin) | resource |
 | [aws_cloudfront_vpc_origin.backend_primary_http](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_vpc_origin) | resource |
 | [aws_cloudwatch_log_group.microservices_exec](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
