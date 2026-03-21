@@ -20,6 +20,11 @@ output "frontend_cloudfront_url" {
   value = module.cloudfront_frontend.frontend_url
 }
 
+output "frontend_cloudfront_distribution_id" {
+  value       = module.cloudfront_frontend.frontend_distribution_id
+  description = "Frontend CloudFront distribution ID."
+}
+
 output "rds_endpoint" {
   value = module.rds.endpoint
 }

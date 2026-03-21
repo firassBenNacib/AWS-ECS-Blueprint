@@ -3,6 +3,11 @@ output "frontend_cloudfront_url" {
   description = "Frontend CloudFront URL from non-prod app deployment root."
 }
 
+output "frontend_cloudfront_distribution_id" {
+  value       = module.app.frontend_cloudfront_distribution_id
+  description = "Frontend CloudFront distribution ID from non-prod app deployment root."
+}
+
 output "rds_endpoint" {
   value       = module.app.rds_endpoint
   description = "RDS endpoint from non-prod app deployment root."
