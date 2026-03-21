@@ -106,12 +106,41 @@ jobs:
 
       - name: Resolve Inputs
         id: resolve_inputs
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
         run: |
+          tfvars_abs=""
+          tfvars_source="repository"
+          case "${{ matrix.slug }}" in
+            prod-app)
+              if [[ -n "${TFVARS_PROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-prod-app.auto.tfvars"
+                printf '%s' "${TFVARS_PROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+                tfvars_source="secret"
+              fi
+              ;;
+            nonprod-app)
+              if [[ -n "${TFVARS_NONPROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-nonprod-app.auto.tfvars"
+                printf '%s' "${TFVARS_NONPROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+                tfvars_source="secret"
+              fi
+              ;;
+          esac
+
+          if [[ -z "${tfvars_abs}" ]]; then
+            tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
+          fi
+
           {
             echo "path=${{ matrix.path }}"
             echo "slug=${{ matrix.slug }}"
             echo "label=${{ matrix.label }}"
-            echo "tfvars_abs=$(realpath "${{ matrix.tfvars_file }}")"
+            echo "tfvars_abs=${tfvars_abs}"
+            echo "tfvars_source=${tfvars_source}"
             if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
               echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
             else
@@ -196,6 +225,25 @@ jobs:
               --set status "skipped" \
               --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
             exit 0
+          fi
+
+          if [[ ! -f "${{ steps.resolve_inputs.outputs.tfvars_abs }}" ]]; then
+            echo "Resolved tfvars file does not exist: ${{ steps.resolve_inputs.outputs.tfvars_abs }}" > "${plan_txt}"
+            python3 .scripts/write_json_result.py \
+              --output "${result_json}" \
+              --set path "${{ steps.resolve_inputs.outputs.path }}" \
+              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
+              --set label "${{ steps.resolve_inputs.outputs.label }}" \
+              --set tfvars_file "${{ matrix.tfvars_file }}" \
+              --set backend_config_file "${{ matrix.backend_config_file }}" \
+              --set backend_key "${{ steps.resolve_inputs.outputs.backend_key }}" \
+              --set backend_region "${{ steps.resolve_inputs.outputs.backend_region }}" \
+              --set aws_region "${{ steps.resolve_inputs.outputs.aws_region }}" \
+              --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
+              --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
+              --set status "error" \
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+            exit 1
           fi
 
           init_args=()

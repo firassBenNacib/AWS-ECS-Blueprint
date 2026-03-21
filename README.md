@@ -154,6 +154,8 @@ Secrets used by the GitHub OIDC deployment path:
 
 - `AWS_ROLE_ARN_PROD_APP`
 - `AWS_ROLE_ARN_NONPROD_APP`
+- `TFVARS_PROD_APP`
+- `TFVARS_NONPROD_APP`
 
 Live validation also uses per-root tfvars secrets, documented in [`docs/ci-cd.md`](./docs/ci-cd.md).
 

@@ -56,9 +56,14 @@ jobs:
 
       - name: Resolve Inputs
         id: resolve
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
         run: |
+          target_path=""
           case "${{ inputs.target }}" in
             prod-app)
+              target_path="prod-app"
               {
                 echo "path=prod-app"
                 echo "aws_region=eu-west-1"
@@ -68,6 +73,7 @@ jobs:
               } >> "${GITHUB_OUTPUT}"
               ;;
             nonprod-app)
+              target_path="nonprod-app"
               {
                 echo "path=nonprod-app"
                 echo "aws_region=eu-west-1"
@@ -82,11 +88,32 @@ jobs:
               ;;
           esac
 
-          tfvars_file="${{ inputs.tfvars_file }}"
-          if [[ -z "${tfvars_file}" ]]; then
-            tfvars_file="terraform.tfvars"
+          tfvars_path=""
+          case "${{ inputs.target }}" in
+            prod-app)
+              if [[ -n "${TFVARS_PROD_APP}" ]]; then
+                tfvars_path="${RUNNER_TEMP}/tfvars-prod-app.auto.tfvars"
+                printf '%s' "${TFVARS_PROD_APP}" > "${tfvars_path}"
+                chmod 600 "${tfvars_path}"
+              fi
+              ;;
+            nonprod-app)
+              if [[ -n "${TFVARS_NONPROD_APP}" ]]; then
+                tfvars_path="${RUNNER_TEMP}/tfvars-nonprod-app.auto.tfvars"
+                printf '%s' "${TFVARS_NONPROD_APP}" > "${tfvars_path}"
+                chmod 600 "${tfvars_path}"
+              fi
+              ;;
+          esac
+
+          if [[ -z "${tfvars_path}" ]]; then
+            tfvars_file="${{ inputs.tfvars_file }}"
+            if [[ -z "${tfvars_file}" ]]; then
+              tfvars_file="terraform.tfvars"
+            fi
+            tfvars_path="${target_path}/${tfvars_file}"
           fi
-          echo "tfvars_file=${tfvars_file}" >> "${GITHUB_OUTPUT}"
+          echo "tfvars_path=${tfvars_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Require explicit confirmation
         run: |
@@ -112,9 +139,8 @@ jobs:
             exit 1
           fi
 
-          tfvars_path="${{ steps.resolve.outputs.path }}/${{ steps.resolve.outputs.tfvars_file }}"
-          if [[ ! -f "${tfvars_path}" ]]; then
-            echo "::error::tfvars file not found: ${tfvars_path}"
+          if [[ ! -f "${{ steps.resolve.outputs.tfvars_path }}" ]]; then
+            echo "::error::tfvars file not found: ${{ steps.resolve.outputs.tfvars_path }}"
             exit 1
           fi
 
@@ -143,7 +169,7 @@ jobs:
             echo "## Destroy Request"
             echo ""
             echo "- Target: \`${{ inputs.target }}\`"
-            echo "- tfvars: \`${{ steps.resolve.outputs.tfvars_file }}\`"
+            echo "- tfvars: \`${{ steps.resolve.outputs.tfvars_path }}\`"
             echo "- Cleanup secrets: \`${{ inputs.cleanup_secrets }}\`"
             echo "- Managed state entries before destroy: \`${state_count}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
@@ -152,10 +178,9 @@ jobs:
         run: |
           args=(
             --root "${{ steps.resolve.outputs.path }}"
-            --tfvars "${{ steps.resolve.outputs.tfvars_file }}"
+            --tfvars "${{ steps.resolve.outputs.tfvars_path }}"
           )
           if [[ "${{ inputs.cleanup_secrets }}" == "true" ]]; then
             args+=(--cleanup-secrets)
           fi
           ./.scripts/safe_destroy_app_root.sh "${args[@]}"
-
