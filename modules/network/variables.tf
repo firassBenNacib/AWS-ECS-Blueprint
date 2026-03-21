@@ -41,6 +41,12 @@ variable "flow_logs_kms_key_id" {
   default     = null
 }
 
+variable "flow_logs_name_prefix" {
+  description = "Prefix used for VPC Flow Logs IAM and CloudWatch log-group names. Defaults to vpc_name when unset."
+  type        = string
+  default     = null
+}
+
 variable "lockdown_default_security_group" {
   description = "When true, removes all rules from the default security group for this VPC"
   type        = bool
