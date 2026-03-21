@@ -234,6 +234,37 @@ disable_rds_deletion_protection() {
     --db-instance-identifier "${identifier}"
 }
 
+stop_cloudtrail_logging() {
+  local trail_address
+  trail_address="$(state_list_matching 'aws_cloudtrail\.this$' | head -n 1)"
+  [[ -z "${trail_address}" ]] && return 0
+
+  local trail_name region
+  trail_name="$(state_value "${trail_address}" name)"
+  region="$(state_value "${trail_address}" home_region)"
+  [[ -z "${trail_name}" || -z "${region}" ]] && return 0
+
+  echo "Stopping CloudTrail logging for ${trail_name}"
+  aws cloudtrail stop-logging \
+    --region "${region}" \
+    --name "${trail_name}" >/dev/null 2>&1 || true
+}
+
+stop_config_recorder() {
+  local recorder_address
+  recorder_address="$(state_list_matching 'aws_config_configuration_recorder\.this(\[[0-9]+\])?$' | head -n 1)"
+  [[ -z "${recorder_address}" ]] && return 0
+
+  local recorder_name
+  recorder_name="$(state_value "${recorder_address}" name)"
+  [[ -z "${recorder_name}" ]] && return 0
+
+  echo "Stopping AWS Config recorder ${recorder_name}"
+  aws configservice stop-configuration-recorder \
+    --region "${AWS_REGION}" \
+    --configuration-recorder-name "${recorder_name}" >/dev/null 2>&1 || true
+}
+
 empty_bucket_versions() {
   local bucket="$1"
   local region="$2"
@@ -344,6 +375,8 @@ cleanup_secrets() {
 
 disable_alb_deletion_protection
 disable_rds_deletion_protection
+stop_cloudtrail_logging
+stop_config_recorder
 empty_managed_buckets
 purge_backup_vault_recovery_points
 

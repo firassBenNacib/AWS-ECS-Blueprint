@@ -67,7 +67,7 @@ resource "aws_db_instance" "this" {
   enabled_cloudwatch_logs_exports     = var.enabled_cloudwatch_logs_exports
   deletion_protection                 = var.deletion_protection
   skip_final_snapshot                 = var.skip_final_snapshot
-  final_snapshot_identifier           = local.final_snapshot_identifier_final
+  final_snapshot_identifier           = var.skip_final_snapshot ? null : local.final_snapshot_identifier_final
   iam_database_authentication_enabled = var.enable_iam_database_auth
   performance_insights_enabled        = var.enable_performance_insights
   performance_insights_kms_key_id     = var.enable_performance_insights ? var.performance_insights_kms_key_id : null
