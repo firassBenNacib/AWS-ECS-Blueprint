@@ -10,7 +10,7 @@ frontend_geo_locations           = []
 
 aws_region                       = "eu-west-1"
 dr_region                        = "us-west-2"
-nonprod_app_role_arn             = "arn:aws:iam::555555555555:role/TerraformExecutionRole"
+nonprod_app_role_arn             = null
 environment_domain                 = "example.com"
 route53_zone_id                  = null
 bucket_name                      = "example-app-frontend-nonprod"

@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
 
 def load_results(results_dir: Path) -> list[dict]:
     results = []
-    for path in sorted(results_dir.glob("*.json")):
+    for path in sorted(results_dir.rglob("*.json")):
         results.append(json.loads(path.read_text()))
     return sorted(results, key=lambda item: item.get("label", item.get("slug", "")))
 
