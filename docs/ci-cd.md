@@ -29,6 +29,11 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Builds saved plan artifacts (`tfplan`, rendered plan text, plan JSON, checksum).
   - Runs advisory Trivy scans against saved plan JSON before upload.
   - Applies the exact saved plan only after GitHub Environment approval.
+- `destroy.yml`
+  - Runs on `workflow_dispatch` only.
+  - Requires an exact typed confirmation string before any AWS credentials are used.
+  - Initializes the shared backend, summarizes managed state, and then runs the guarded destroy helper.
+  - Uses separate destroy environments so approval rules for destructive actions can be stricter than apply rules.
 - `live-validation.yml`
   - Runs nightly for scheduled validation targets and on demand for selected deployment roots.
   - Uses isolated local Terraform state, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
@@ -85,7 +90,12 @@ Protected apply jobs use these environment names:
 - `prod-app`
 - `nonprod-app`
 
-Configure required reviewers on those environments to gate applies.
+Protected destroy jobs should use these environment names:
+
+- `prod-app-destroy`
+- `nonprod-app-destroy`
+
+Configure required reviewers on all of those environments to gate applies and destroys.
 
 ## Saved Plans vs PR Plans
 

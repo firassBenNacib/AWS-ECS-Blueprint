@@ -1,0 +1,161 @@
+name: Destroy Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Terraform target to destroy"
+        required: true
+        default: "nonprod-app"
+        type: choice
+        options:
+          - nonprod-app
+          - prod-app
+      tfvars_file:
+        description: "Optional var-file override relative to the target root"
+        required: false
+        default: "terraform.tfvars"
+      cleanup_secrets:
+        description: "Delete environment-scoped Secrets Manager entries after destroy"
+        required: false
+        type: boolean
+        default: true
+      confirmation:
+        description: "Type exactly: destroy <target>"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
+
+concurrency:
+  group: destroy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: ${{ inputs.target == 'prod-app' && 'prod-app-destroy' || 'nonprod-app-destroy' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Resolve Inputs
+        id: resolve
+        run: |
+          case "${{ inputs.target }}" in
+            prod-app)
+              {
+                echo "path=prod-app"
+                echo "aws_region=eu-west-1"
+                echo "backend_key=prod-app/prod/terraform.tfstate"
+                echo "role_env_var=AWS_ROLE_ARN_PROD_APP"
+                echo "role_label=prod-app"
+              } >> "${GITHUB_OUTPUT}"
+              ;;
+            nonprod-app)
+              {
+                echo "path=nonprod-app"
+                echo "aws_region=eu-west-1"
+                echo "backend_key=nonprod-app/nonprod/terraform.tfstate"
+                echo "role_env_var=AWS_ROLE_ARN_NONPROD_APP"
+                echo "role_label=nonprod-app"
+              } >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "Unsupported target: ${{ inputs.target }}" >&2
+              exit 1
+              ;;
+          esac
+
+          tfvars_file="${{ inputs.tfvars_file }}"
+          if [[ -z "${tfvars_file}" ]]; then
+            tfvars_file="terraform.tfvars"
+          fi
+          echo "tfvars_file=${tfvars_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Require explicit confirmation
+        run: |
+          expected="destroy ${{ inputs.target }}"
+          if [[ "${{ inputs.confirmation }}" != "${expected}" ]]; then
+            echo "::error::Confirmation mismatch. Type exactly '${expected}'."
+            exit 1
+          fi
+
+      - name: Check destroy prerequisites
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+        run: |
+          role_arn="$(printenv "${{ steps.resolve.outputs.role_env_var }}" || true)"
+          if [[ -z "${role_arn}" ]]; then
+            echo "::error::Missing AWS role secret for ${{ steps.resolve.outputs.role_label }}."
+            exit 1
+          fi
+
+          if [[ -z "${TF_BACKEND_BUCKET}" ]]; then
+            echo "::error::Missing TF_BACKEND_BUCKET repo variable."
+            exit 1
+          fi
+
+          tfvars_path="${{ steps.resolve.outputs.path }}/${{ steps.resolve.outputs.tfvars_file }}"
+          if [[ ! -f "${tfvars_path}" ]]; then
+            echo "::error::tfvars file not found: ${tfvars_path}"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ steps.resolve.outputs.role_env_var }}
+          role_label: ${{ steps.resolve.outputs.role_label }}
+          aws_region: ${{ steps.resolve.outputs.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Initialize Terraform backend
+        run: |
+          backend_region="${TF_BACKEND_REGION:-${{ steps.resolve.outputs.aws_region }}}"
+          terraform -chdir="${{ steps.resolve.outputs.path }}" init \
+            -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+            -backend-config="key=${{ steps.resolve.outputs.backend_key }}" \
+            -backend-config="region=${backend_region}" \
+            -backend-config="encrypt=true"
+
+      - name: Summarize managed state before destroy
+        run: |
+          state_count="$(terraform -chdir="${{ steps.resolve.outputs.path }}" state list | wc -l | tr -d ' ')"
+          {
+            echo "## Destroy Request"
+            echo ""
+            echo "- Target: \`${{ inputs.target }}\`"
+            echo "- tfvars: \`${{ steps.resolve.outputs.tfvars_file }}\`"
+            echo "- Cleanup secrets: \`${{ inputs.cleanup_secrets }}\`"
+            echo "- Managed state entries before destroy: \`${state_count}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Destroy target
+        run: |
+          args=(
+            --root "${{ steps.resolve.outputs.path }}"
+            --tfvars "${{ steps.resolve.outputs.tfvars_file }}"
+          )
+          if [[ "${{ inputs.cleanup_secrets }}" == "true" ]]; then
+            args+=(--cleanup-secrets)
+          fi
+          ./.scripts/safe_destroy_app_root.sh "${args[@]}"
+
