@@ -2,11 +2,12 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 --path PATH --aws-region REGION --smoke-profile PROFILE" >&2
+  echo "Usage: $0 --path PATH --state-file FILE --aws-region REGION --smoke-profile PROFILE" >&2
   exit 1
 }
 
 PATH_ARG=""
+STATE_FILE=""
 AWS_REGION=""
 SMOKE_PROFILE=""
 
@@ -14,6 +15,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --path)
       PATH_ARG=$2
+      shift 2
+      ;;
+    --state-file)
+      STATE_FILE=$2
       shift 2
       ;;
     --aws-region)
@@ -30,11 +35,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "${PATH_ARG}" && -n "${AWS_REGION}" && -n "${SMOKE_PROFILE}" ]] || usage
+[[ -n "${PATH_ARG}" && -n "${STATE_FILE}" && -n "${AWS_REGION}" && -n "${SMOKE_PROFILE}" ]] || usage
 
 terraform_output_raw() {
   local output_name=$1
-  terraform -chdir="${PATH_ARG}" output -raw "${output_name}" 2>/dev/null || true
+  terraform -chdir="${PATH_ARG}" output -state="${STATE_FILE}" -raw "${output_name}" 2>/dev/null || true
 }
 
 check_http_endpoint() {
