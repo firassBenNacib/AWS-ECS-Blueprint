@@ -22,6 +22,7 @@ When `frontend_runtime_mode = "ecs"`, the backend side stays the same, but the f
 - [Make Targets](#make-targets)
 - [CI/CD and GitHub Actions](#cicd-and-github-actions)
 - [License](#license)
+- [Author](#author)
 
 ## Prerequisites
 
