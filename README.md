@@ -4,10 +4,15 @@ An AWS Terraform blueprint for private web workloads on ECS Fargate, with CloudF
 
 ### Architecture
 
-[![architecture](./img/aws-ecs-blueprint-architecture.png)](./img/aws-ecs-blueprint-architecture.png)
+Default frontend `s3` mode:
 
-This diagram shows the default frontend `s3` delivery path: `Route53 -> CloudFront (frontend) -> private S3 (OAC)`.
-When `frontend_runtime_mode = "ecs"`, the backend side stays the same, but the frontend origin swaps from private S3 to the internal ALB/ECS frontend path.
+[![architecture default s3](./img/aws-ecs-blueprint-architecture.png)](./img/aws-ecs-blueprint-architecture.png)
+
+Frontend `ecs` mode:
+
+[![architecture frontend ecs](./img/aws-ecs-blueprint-architecture-frontend-ecs.png)](./img/aws-ecs-blueprint-architecture-frontend-ecs.png)
+
+The backend side stays the same across both diagrams. The frontend side changes from `Route53 -> CloudFront (frontend) -> private S3 (OAC)` in `s3` mode to `Route53 -> CloudFront (frontend) -> internal ALB/ECS frontend` in `ecs` mode.
 
 ## Table of Contents
 
