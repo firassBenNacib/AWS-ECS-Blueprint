@@ -3,6 +3,9 @@ name: Plan Terraform Changes
 on:
   pull_request:
     paths:
+      - "README.md"
+      - "docs/**"
+      - "img/**"
       - ".github/**"
       - ".github/workflows/**"
       - ".github/actions/**"
