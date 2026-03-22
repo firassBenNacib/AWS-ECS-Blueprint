@@ -234,6 +234,30 @@ disable_rds_deletion_protection() {
     --db-instance-identifier "${identifier}"
 }
 
+delete_existing_rds_final_snapshot() {
+  local rds_address
+  rds_address="$(state_list_matching 'aws_db_instance\.this$' | head -n 1)"
+  [[ -z "${rds_address}" ]] && return 0
+
+  local identifier region final_snapshot_identifier
+  identifier="$(state_value "${rds_address}" identifier)"
+  region="$(state_value "${rds_address}" region)"
+  [[ -z "${identifier}" || -z "${region}" ]] && return 0
+
+  final_snapshot_identifier="${identifier}-final"
+  if aws rds describe-db-snapshots \
+    --region "${region}" \
+    --db-snapshot-identifier "${final_snapshot_identifier}" >/dev/null 2>&1; then
+    echo "Deleting existing RDS final snapshot ${final_snapshot_identifier}"
+    aws rds delete-db-snapshot \
+      --region "${region}" \
+      --db-snapshot-identifier "${final_snapshot_identifier}" >/dev/null
+    aws rds wait db-snapshot-deleted \
+      --region "${region}" \
+      --db-snapshot-identifier "${final_snapshot_identifier}"
+  fi
+}
+
 stop_cloudtrail_logging() {
   local trail_address
   trail_address="$(state_list_matching 'aws_cloudtrail\.this$' | head -n 1)"
@@ -375,6 +399,7 @@ cleanup_secrets() {
 
 disable_alb_deletion_protection
 disable_rds_deletion_protection
+delete_existing_rds_final_snapshot
 stop_cloudtrail_logging
 stop_config_recorder
 empty_managed_buckets
