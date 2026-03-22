@@ -3,6 +3,9 @@ name: Terraform CI
 on:
   pull_request:
     paths:
+      - "README.md"
+      - "docs/**"
+      - "img/**"
       - ".github/workflows/**"
       - ".github/actions/**"
       - "ci/**"
@@ -18,6 +21,9 @@ on:
       - ".terraform.lock.hcl"
   push:
     paths:
+      - "README.md"
+      - "docs/**"
+      - "img/**"
       - ".github/workflows/**"
       - ".github/actions/**"
       - "ci/**"
