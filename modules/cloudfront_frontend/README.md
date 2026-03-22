@@ -16,7 +16,7 @@ Reusable Terraform module for the frontend CloudFront distribution in front of t
 
 | Name | Version |
 |------|---------|
-| aws | 6.37.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Modules
 

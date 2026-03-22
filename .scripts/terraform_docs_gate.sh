@@ -24,7 +24,12 @@ resolve_modules() {
 
 write_docs() {
   local module_dir=$1
-  terraform-docs --config "${ROOT_DIR}/.tfdocs.yaml" "${module_dir}" >/dev/null
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  tar --exclude='.terraform' --exclude='.terraform.lock.hcl' -cf - -C "${module_dir}" . | tar -xf - -C "${tmp_dir}"
+  terraform-docs --config "${ROOT_DIR}/.tfdocs.yaml" "${tmp_dir}" >/dev/null
+  cp "${tmp_dir}/README.md" "${module_dir}/README.md"
+  rm -rf "${tmp_dir}"
 }
 
 check_docs() {
