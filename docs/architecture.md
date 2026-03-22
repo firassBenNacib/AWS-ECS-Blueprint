@@ -2,8 +2,16 @@
 
 ## Public Entry Path
 
-- Frontend: `Route53 -> CloudFront (frontend) -> private S3 (OAC)`.
+- Frontend default: `Route53 -> CloudFront (frontend) -> private S3 (OAC)`.
+- Frontend optional: `Route53 -> CloudFront (frontend) -> internal ALB/VPC origin -> ECS frontend` when `frontend_runtime_mode = "ecs"`.
 - Backend: `Route53 -> CloudFront (backend) -> internal ALB (VPC origin) -> ECS Fargate (private subnets) -> RDS`.
+
+## Frontend Runtime Note
+
+- `frontend_runtime_mode = "ecs"` changes the frontend traffic path and skips provisioning the frontend content buckets and replication path.
+- Log buckets and Terraform state storage can still use S3; the ECS-only behavior applies to frontend content delivery resources.
+- The checked-in architecture image is the default `s3` frontend path: `Route53 -> CloudFront (frontend) -> private S3 (OAC)`.
+- If you switch the frontend to `ecs`, the backend side stays the same and the frontend origin swaps from private S3 to the internal ALB/ECS frontend path.
 
 ## Why CloudFront Is Required For Backend
 

@@ -6,12 +6,16 @@ An AWS Terraform blueprint for private web workloads on ECS Fargate, with CloudF
 
 [![architecture](./img/aws-ecs-blueprint-architecture.png)](./img/aws-ecs-blueprint-architecture.png)
 
+This diagram shows the default frontend `s3` delivery path: `Route53 -> CloudFront (frontend) -> private S3 (OAC)`.
+When `frontend_runtime_mode = "ecs"`, the backend side stays the same, but the frontend origin swaps from private S3 to the internal ALB/ECS frontend path.
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Runtime Modes](#runtime-modes)
+- [Frontend Delivery Modes](#frontend-delivery-modes)
 - [Architecture and Networking](#architecture-and-networking)
 - [Terraform Configuration](#terraform-configuration)
 - [Repository Layout](#repository-layout)
@@ -32,7 +36,7 @@ An AWS Terraform blueprint for private web workloads on ECS Fargate, with CloudF
 ## Installation
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/firassBenNacib/AWS-ECS-Blueprint.git
 cd AWS-ECS-Blueprint
 cp prod-app/backend.hcl.example prod-app/backend.hcl
 cp prod-app/terraform.microservices.tfvars.example prod-app/terraform.tfvars
@@ -56,7 +60,7 @@ terraform -chdir=prod-app init -reconfigure -backend-config=backend.hcl
 terraform -chdir=prod-app plan -var-file=terraform.tfvars
 ```
 
-3. Apply the stack:
+3. Apply the deployment:
 
 ```bash
 terraform -chdir=prod-app apply -var-file=terraform.tfvars
@@ -71,11 +75,19 @@ Use the same flow for `nonprod-app`.
 
 The checked-in `prod-app` and `nonprod-app` examples currently use `gateway_microservices`.
 
+## Frontend Delivery Modes
+
+- Default path: `frontend_runtime_mode = "s3"` keeps the frontend on a private S3 origin behind CloudFront with OAC.
+- Alternate path: `frontend_runtime_mode = "ecs"` switches the frontend CloudFront origin to the ALB/ECS path.
+- `ecs` frontend mode now avoids provisioning the frontend content buckets, frontend bucket policies, and frontend replication path.
+- Platform S3 usage still exists for logs and state where configured; the ECS-only change applies to frontend content delivery resources.
+
 ## Architecture and Networking
 
 - Runtime is ECS on Fargate.
-- Users reach the stack through Route53 and two CloudFront distributions.
-- The frontend CloudFront distribution serves a private S3 frontend origin through OAC.
+- Users reach the deployment through Route53 and two CloudFront distributions.
+- By default, the frontend CloudFront distribution serves a private S3 frontend origin through OAC.
+- When `frontend_runtime_mode = "ecs"`, the frontend CloudFront distribution uses the ALB/ECS frontend origin instead of frontend content buckets.
 - The backend CloudFront distribution reaches the application through AWS WAF and an internal ALB.
 - ECS tasks run in private app subnets with no public IPs.
 - AWS API access stays private through interface VPC endpoints for ECR, CloudWatch Logs, Secrets Manager, STS, and KMS, plus an S3 gateway endpoint.
@@ -169,3 +181,7 @@ Protected GitHub environments should exist for:
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).
+
+## Author
+
+Created and maintained by Firas Ben Nacib - [bennacibfiras@gmail.com](mailto:bennacibfiras@gmail.com)

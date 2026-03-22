@@ -8,6 +8,8 @@ locals {
   is_prod                           = local.environment_name == "prod"
   runtime_mode_is_single            = var.app_runtime_mode == "single_backend"
   runtime_mode_is_micro             = var.app_runtime_mode == "gateway_microservices"
+  frontend_runtime_is_s3            = var.frontend_runtime_mode == "s3"
+  frontend_runtime_is_ecs           = var.frontend_runtime_mode == "ecs"
   account_security_controls_enabled = var.enable_security_baseline && var.enable_account_security_controls
   common_tags = merge(
     {
@@ -74,7 +76,12 @@ locals {
   selected_private_app_subnet_ids = sort(module.network.private_app_subnet_ids)
   selected_db_subnet_ids          = sort(module.network.private_db_subnet_ids)
   cloudfront_logs_bucket_domain   = "${trimspace(var.cloudfront_logs_bucket_name)}.s3.amazonaws.com"
-  dr_frontend_bucket_domain       = aws_s3_bucket.frontend_dr.bucket_regional_domain_name
+  frontend_primary_bucket_name    = local.frontend_runtime_is_s3 ? try(module.s3[0].bucket_name, null) : null
+  frontend_primary_bucket_domain  = local.frontend_runtime_is_s3 ? try(module.s3[0].bucket_domain_name, "") : ""
+  frontend_primary_bucket_arn     = local.frontend_runtime_is_s3 ? try(module.s3[0].bucket_arn, null) : null
+  frontend_dr_bucket_name         = local.frontend_runtime_is_s3 ? try(aws_s3_bucket.frontend_dr[0].id, null) : null
+  frontend_dr_bucket_arn          = local.frontend_runtime_is_s3 ? try(aws_s3_bucket.frontend_dr[0].arn, null) : null
+  dr_frontend_bucket_domain       = local.frontend_runtime_is_s3 ? try(aws_s3_bucket.frontend_dr[0].bucket_regional_domain_name, "") : ""
   vpc_flow_logs_kms_key_arn       = var.vpc_flow_logs_kms_key_id != null ? var.vpc_flow_logs_kms_key_id : null
   ecs_exec_kms_key_arn_final      = var.enable_ecs_exec ? aws_kms_key.ecs_exec[0].arn : null
   backend_env_defaults = {
@@ -730,7 +737,7 @@ data "aws_iam_policy_document" "s3_access_logs_dr_bucket_policy" {
       test     = "ArnLike"
       variable = "aws:SourceArn"
       values = compact([
-        aws_s3_bucket.frontend_dr.arn,
+        local.frontend_dr_bucket_arn,
         aws_s3_bucket.cloudfront_logs_dr.arn,
         aws_s3_bucket.alb_access_logs_dr.arn
       ])
@@ -1341,10 +1348,10 @@ module "backup_baseline" {
   backup_completion_window_minutes = var.aws_backup_completion_window_minutes
   backup_cross_region_copy_enabled = var.aws_backup_cross_region_copy_enabled
   backup_copy_retention_days       = var.aws_backup_copy_retention_days
-  backup_resource_arns = [
+  backup_resource_arns = compact([
     module.rds.instance_arn,
-    module.s3.bucket_arn
-  ]
+    local.frontend_primary_bucket_arn
+  ])
 }
 
 module "security_groups" {
@@ -1939,6 +1946,7 @@ resource "aws_wafv2_web_acl_logging_configuration" "cloudfront" {
 }
 
 module "s3" {
+  count  = local.frontend_runtime_is_s3 ? 1 : 0
   source = "../s3"
 
   bucket_name                                      = local.bucket_name_final
@@ -1951,10 +1959,10 @@ module "s3" {
   access_logging_target_prefix                     = "s3-access/frontend/"
   access_logging_prerequisite_ids                  = var.enable_s3_access_logging ? [aws_s3_bucket_policy.s3_access_logs_bucket.id] : []
   enable_replication                               = true
-  replication_role_arn                             = aws_iam_role.frontend_replication.arn
-  replication_destination_bucket_arn               = aws_s3_bucket.frontend_dr.arn
+  replication_role_arn                             = aws_iam_role.frontend_replication[0].arn
+  replication_destination_bucket_arn               = aws_s3_bucket.frontend_dr[0].arn
   replication_replica_kms_key_id                   = local.s3_dr_kms_key_arn
-  replication_prerequisite_ids                     = [aws_s3_bucket_versioning.frontend_dr.id, aws_iam_role_policy.frontend_replication.id]
+  replication_prerequisite_ids                     = [aws_s3_bucket_versioning.frontend_dr[0].id, aws_iam_role_policy.frontend_replication[0].id]
   enable_lifecycle                                 = var.enable_s3_lifecycle
   lifecycle_expiration_days                        = var.s3_lifecycle_expiration_days
   lifecycle_noncurrent_expiration_days             = var.s3_lifecycle_noncurrent_expiration_days
@@ -2007,7 +2015,7 @@ data "aws_iam_policy_document" "s3_access_logs_bucket_policy" {
       test     = "ArnLike"
       variable = "aws:SourceArn"
       values = compact([
-        module.s3.bucket_arn,
+        local.frontend_primary_bucket_arn,
         aws_s3_bucket.alb_access_logs.arn,
         aws_s3_bucket.cloudfront_logs.arn
       ])
@@ -2021,6 +2029,7 @@ resource "aws_s3_bucket_policy" "s3_access_logs_bucket" {
 }
 
 resource "aws_s3_bucket" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
   #checkov:skip=CKV_AWS_144: Destination bucket in the frontend CRR topology; Checkov can miss the module-owned source replication association.
   bucket        = local.dr_frontend_bucket_name_final
@@ -2028,15 +2037,17 @@ resource "aws_s3_bucket" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_notification" "frontend_dr_eventbridge" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   eventbridge = true
 }
 
 resource "aws_s3_bucket_ownership_controls" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
@@ -2044,8 +2055,9 @@ resource "aws_s3_bucket_ownership_controls" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -2056,8 +2068,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_versioning" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   versioning_configuration {
     status = "Enabled"
@@ -2065,8 +2078,9 @@ resource "aws_s3_bucket_versioning" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -2075,8 +2089,9 @@ resource "aws_s3_bucket_public_access_block" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "frontend_dr" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
-  bucket   = aws_s3_bucket.frontend_dr.id
+  bucket   = aws_s3_bucket.frontend_dr[0].id
 
   rule {
     id     = "frontend-dr-lifecycle"
@@ -2093,10 +2108,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend_dr" {
 }
 
 resource "aws_s3_bucket_logging" "frontend_dr" {
-  provider = aws.dr
-  count    = var.enable_s3_access_logging ? 1 : 0
-
-  bucket        = aws_s3_bucket.frontend_dr.id
+  count         = local.frontend_runtime_is_s3 && var.enable_s3_access_logging ? 1 : 0
+  provider      = aws.dr
+  bucket        = aws_s3_bucket.frontend_dr[0].id
   target_bucket = aws_s3_bucket.s3_access_logs_dr.id
   target_prefix = "s3-access/frontend-dr/"
 
@@ -2282,7 +2296,7 @@ resource "aws_cloudfront_response_headers_policy" "secure_defaults" {
 module "cloudfront_frontend" {
   source = "../cloudfront_frontend"
 
-  frontend_bucket_domain     = module.s3.bucket_domain_name
+  frontend_bucket_domain     = local.frontend_primary_bucket_domain
   secondary_bucket_domain    = local.dr_frontend_bucket_domain
   frontend_aliases           = local.frontend_aliases_final
   frontend_cert_arn          = var.acm_cert_frontend
@@ -2327,6 +2341,8 @@ module "cloudfront_frontend" {
 }
 
 data "aws_iam_policy_document" "frontend_bucket_policy" {
+  count = local.frontend_runtime_is_s3 ? 1 : 0
+
   statement {
     sid    = "DenyInsecureTransport"
     effect = "Deny"
@@ -2338,8 +2354,8 @@ data "aws_iam_policy_document" "frontend_bucket_policy" {
 
     actions = ["s3:*"]
     resources = [
-      module.s3.bucket_arn,
-      "${module.s3.bucket_arn}/*"
+      local.frontend_primary_bucket_arn,
+      "${local.frontend_primary_bucket_arn}/*"
     ]
 
     condition {
@@ -2358,7 +2374,7 @@ data "aws_iam_policy_document" "frontend_bucket_policy" {
     }
 
     actions   = ["s3:GetObject"]
-    resources = ["${module.s3.bucket_arn}/*"]
+    resources = ["${local.frontend_primary_bucket_arn}/*"]
 
     condition {
       test     = "StringEquals"
@@ -2375,11 +2391,14 @@ data "aws_iam_policy_document" "frontend_bucket_policy" {
 }
 
 resource "aws_s3_bucket_policy" "frontend_policy" {
-  bucket = module.s3.bucket_name
-  policy = data.aws_iam_policy_document.frontend_bucket_policy.json
+  count  = local.frontend_runtime_is_s3 ? 1 : 0
+  bucket = local.frontend_primary_bucket_name
+  policy = data.aws_iam_policy_document.frontend_bucket_policy[0].json
 }
 
 data "aws_iam_policy_document" "frontend_dr_bucket_policy" {
+  count = local.frontend_runtime_is_s3 ? 1 : 0
+
   statement {
     sid    = "DenyInsecureTransport"
     effect = "Deny"
@@ -2391,8 +2410,8 @@ data "aws_iam_policy_document" "frontend_dr_bucket_policy" {
 
     actions = ["s3:*"]
     resources = [
-      aws_s3_bucket.frontend_dr.arn,
-      "${aws_s3_bucket.frontend_dr.arn}/*"
+      local.frontend_dr_bucket_arn,
+      "${local.frontend_dr_bucket_arn}/*"
     ]
 
     condition {
@@ -2412,7 +2431,7 @@ data "aws_iam_policy_document" "frontend_dr_bucket_policy" {
     }
 
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.frontend_dr.arn}/*"]
+    resources = ["${local.frontend_dr_bucket_arn}/*"]
 
     condition {
       test     = "StringEquals"
@@ -2429,13 +2448,16 @@ data "aws_iam_policy_document" "frontend_dr_bucket_policy" {
 }
 
 resource "aws_s3_bucket_policy" "frontend_dr_policy" {
+  count    = local.frontend_runtime_is_s3 ? 1 : 0
   provider = aws.dr
 
-  bucket = aws_s3_bucket.frontend_dr.id
-  policy = data.aws_iam_policy_document.frontend_dr_bucket_policy.json
+  bucket = local.frontend_dr_bucket_name
+  policy = data.aws_iam_policy_document.frontend_dr_bucket_policy[0].json
 }
 
 data "aws_iam_policy_document" "frontend_replication_assume_role" {
+  count = local.frontend_runtime_is_s3 ? 1 : 0
+
   statement {
     effect = "Allow"
 
@@ -2449,18 +2471,22 @@ data "aws_iam_policy_document" "frontend_replication_assume_role" {
 }
 
 resource "aws_iam_role" "frontend_replication" {
+  count = local.frontend_runtime_is_s3 ? 1 : 0
+
   name               = local.enable_environment_suffix ? "s3-frontend-replication-${local.environment_name}" : "s3-frontend-replication"
-  assume_role_policy = data.aws_iam_policy_document.frontend_replication_assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.frontend_replication_assume_role[0].json
 }
 
 data "aws_iam_policy_document" "frontend_replication" {
+  count = local.frontend_runtime_is_s3 ? 1 : 0
+
   statement {
     sid = "SourceBucketConfig"
     actions = [
       "s3:GetReplicationConfiguration",
       "s3:ListBucket"
     ]
-    resources = [module.s3.bucket_arn]
+    resources = [local.frontend_primary_bucket_arn]
   }
 
   #tfsec:ignore:aws-iam-no-policy-wildcards S3 replication requires object ARN wildcards to cover all keys in the source bucket.
@@ -2473,7 +2499,7 @@ data "aws_iam_policy_document" "frontend_replication" {
       "s3:GetObjectRetention",
       "s3:GetObjectLegalHold"
     ]
-    resources = ["${module.s3.bucket_arn}/*"]
+    resources = ["${local.frontend_primary_bucket_arn}/*"]
   }
 
   statement {
@@ -2484,7 +2510,7 @@ data "aws_iam_policy_document" "frontend_replication" {
       "s3:ReplicateTags",
       "s3:ObjectOwnerOverrideToBucketOwner"
     ]
-    resources = ["${aws_s3_bucket.frontend_dr.arn}/*"]
+    resources = ["${local.frontend_dr_bucket_arn}/*"]
   }
 
   statement {
@@ -2506,9 +2532,10 @@ data "aws_iam_policy_document" "frontend_replication" {
 }
 
 resource "aws_iam_role_policy" "frontend_replication" {
+  count  = local.frontend_runtime_is_s3 ? 1 : 0
   name   = local.enable_environment_suffix ? "s3-frontend-replication-${local.environment_name}" : "s3-frontend-replication"
-  role   = aws_iam_role.frontend_replication.id
-  policy = data.aws_iam_policy_document.frontend_replication.json
+  role   = aws_iam_role.frontend_replication[0].id
+  policy = data.aws_iam_policy_document.frontend_replication[0].json
 }
 
 data "aws_iam_policy_document" "cloudfront_logs_replication_assume_role" {

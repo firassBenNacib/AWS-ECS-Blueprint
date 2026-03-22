@@ -33,6 +33,8 @@ locals {
 }
 
 resource "aws_cloudfront_origin_access_control" "frontend_oac" {
+  count = local.use_s3 ? 1 : 0
+
   name                              = local.oac_name
   description                       = "Origin Access Control for CloudFront"
   origin_access_control_origin_type = "s3"
@@ -82,7 +84,7 @@ resource "aws_cloudfront_distribution" "frontend" {
     content {
       domain_name              = var.frontend_bucket_domain
       origin_id                = "S3-frontend-origin"
-      origin_access_control_id = aws_cloudfront_origin_access_control.frontend_oac.id
+      origin_access_control_id = aws_cloudfront_origin_access_control.frontend_oac[0].id
     }
   }
 
@@ -91,7 +93,7 @@ resource "aws_cloudfront_distribution" "frontend" {
     content {
       domain_name              = var.secondary_bucket_domain
       origin_id                = "S3-frontend-origin-dr"
-      origin_access_control_id = aws_cloudfront_origin_access_control.frontend_oac.id
+      origin_access_control_id = aws_cloudfront_origin_access_control.frontend_oac[0].id
     }
   }
 

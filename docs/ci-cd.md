@@ -25,14 +25,14 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Uploads plan text artifacts and updates a single sticky PR comment.
   - Does not create saved plan files for later apply.
 - `deploy.yml`
-  - Runs on pushes to `main` and `workflow_dispatch`.
+  - Runs on `workflow_dispatch` only.
   - Builds saved plan artifacts (`tfplan`, rendered plan text, plan JSON, checksum).
   - Runs advisory Trivy scans against saved plan JSON before upload.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
-  - Applies the exact saved plan only after GitHub Environment approval.
+  - Applies the downloaded saved plan artifact only after GitHub Environment approval when `apply_after_plan=true`.
 - `destroy.yml`
   - Runs on `workflow_dispatch` only.
-  - Requires an exact typed confirmation string before any AWS credentials are used.
+  - Requires a confirmation string matching `destroy <target>` after whitespace normalization before any AWS credentials are used.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
   - Initializes the shared backend, summarizes managed state, and then runs the guarded destroy helper.
   - Uses separate destroy environments so approval rules for destructive actions can be stricter than apply rules.
@@ -42,6 +42,7 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Expects dedicated live-validation tfvars secrets for each enabled target.
   - Keep a target disabled until it has dedicated validation-only DNS and ACM certificates; do not point live validation at the exact hostnames used by a live environment.
   - The repository currently keeps both app roots disabled for live validation because there are no dedicated validation-only DNS names and ACM certificates configured yet.
+  - Manual dispatch currently exposes only `prod-app`; with no enabled targets, the workflow reports that live validation is disabled.
 
 ## Shared Actions
 
@@ -72,7 +73,7 @@ Backend configuration for saved-plan workflows:
 - `TF_BACKEND_BUCKET`
 - `TF_BACKEND_REGION`
 
-The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates against isolated local state and destroys in the same job.
+The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. Deploy `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates against isolated local state and destroys in the same job.
 
 ## Secrets
 
@@ -87,6 +88,8 @@ Live-validation tfvars secrets:
 
 - `LIVE_VALIDATION_TFVARS_PROD_APP`
 - `LIVE_VALIDATION_TFVARS_NONPROD_APP`
+
+Those live-validation tfvars secrets are only consumed if you later re-enable the corresponding target in `ci/terraform-targets.json`.
 
 ## GitHub Environments
 
@@ -105,8 +108,8 @@ Configure required reviewers on all of those environments to gate applies and de
 ## Saved Plans vs PR Plans
 
 - Pull request plans are speculative and are used only for review feedback.
-- Deploy workflow plans are non-speculative saved plan files.
-- Apply always consumes the saved plan artifact created earlier in the same workflow.
+- Deploy workflow plans are non-speculative saved plan files plus rendered plan output and plan JSON.
+- Apply consumes the saved plan artifact created earlier in the same workflow after environment approval.
 
 ## Target Catalog
 
