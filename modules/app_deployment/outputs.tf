@@ -112,8 +112,8 @@ output "cloudfront_logs_bucket_name" {
 }
 
 output "frontend_bucket_name" {
-  value       = module.s3.bucket_name
-  description = "Primary frontend content bucket."
+  value       = local.frontend_primary_bucket_name
+  description = "Primary frontend content bucket in frontend s3 mode; null in frontend ecs mode."
 }
 
 output "s3_access_logs_bucket_name" {
@@ -132,8 +132,8 @@ output "alb_access_logs_dr_bucket_name" {
 }
 
 output "frontend_dr_bucket_name" {
-  value       = aws_s3_bucket.frontend_dr.id
-  description = "DR replica bucket for frontend content."
+  value       = local.frontend_dr_bucket_name
+  description = "DR replica bucket for frontend content in frontend s3 mode; null in frontend ecs mode."
 }
 
 output "cloudfront_logs_dr_bucket_name" {

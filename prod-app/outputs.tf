@@ -65,7 +65,7 @@ output "alb_access_logs_dr_bucket_name" {
 
 output "frontend_bucket_name" {
   value       = module.app.frontend_bucket_name
-  description = "Primary frontend bucket from prod app deployment root."
+  description = "Primary frontend bucket from the prod app deployment root in frontend s3 mode; null in frontend ecs mode."
 }
 
 output "backend_alb_arn" {

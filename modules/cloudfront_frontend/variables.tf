@@ -1,11 +1,13 @@
 variable "frontend_bucket_domain" {
   description = "S3 bucket domain name"
   type        = string
+  default     = ""
 }
 
 variable "secondary_bucket_domain" {
   description = "DR S3 bucket domain name used as secondary origin for CloudFront failover"
   type        = string
+  default     = ""
 }
 
 variable "frontend_aliases" {

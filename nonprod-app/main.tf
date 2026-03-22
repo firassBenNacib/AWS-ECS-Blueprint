@@ -21,7 +21,7 @@ locals {
 }
 
 module "app" {
-  source = "../modules/app_stack"
+  source = "../modules/app_deployment"
 
   aws_region = var.aws_region
   dr_region  = var.dr_region
