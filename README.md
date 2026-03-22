@@ -27,6 +27,7 @@ The backend side stays the same across both diagrams. The frontend side changes 
 - [Make Targets](#make-targets)
 - [CI/CD and GitHub Actions](#cicd-and-github-actions)
 - [License](#license)
+- [Author](#author)
 
 ## Prerequisites
 
