@@ -349,10 +349,10 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | cloudfront_logs_dr_bucket_name | DR replica bucket for CloudFront logs. |
 | db_subnet_ids | n/a |
 | ecs_service_names | ECS service names keyed by logical service name in gateway_microservices mode. |
-| frontend_bucket_name | Primary frontend content bucket in frontend `s3` mode; `null` in frontend `ecs` mode. |
+| frontend_bucket_name | Primary frontend content bucket in frontend s3 mode; null in frontend ecs mode. |
 | frontend_cloudfront_distribution_id | Frontend CloudFront distribution ID. |
 | frontend_cloudfront_url | n/a |
-| frontend_dr_bucket_name | DR replica bucket for frontend content in frontend `s3` mode; `null` in frontend `ecs` mode. |
+| frontend_dr_bucket_name | DR replica bucket for frontend content in frontend s3 mode; null in frontend ecs mode. |
 | private_app_subnet_ids | Private app subnet IDs used by backend ECS service |
 | public_app_subnet_ids | Public edge subnet IDs used by NAT/egress routing. |
 | public_service_name | Public ECS service name attached to the backend ALB in gateway_microservices mode. |
