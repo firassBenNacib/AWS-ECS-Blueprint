@@ -226,9 +226,9 @@ Common targets:
 - `make docs-check`: check module documentation drift
 - `make scan-root ROOT=prod-app`: run local Terraform security scans for one deployment root
 - `make scan-roots`: run local Terraform security scans for all deployment roots
-- `make plan-root ROOT=prod-app`: run a local plan for one deployment root
+- `make plan-root ROOT=prod-app`: run a locked local plan for one deployment root
 - `make plan-roots`: run local plans for all deployment roots
-- `make tag-plan-root ROOT=prod-app`: report tag coverage from a root plan
+- `make tag-plan-root ROOT=prod-app`: report tag coverage from a locked root plan
 - `make tag-state-root ROOT=prod-app`: report tag coverage from a root state
 - `make destroy-root ROOT=prod-app`: guarded destroy flow for one deployment root
 - `make destroy-roots CONFIRM_ALL=true`: guarded destroy flow for all deployment roots
