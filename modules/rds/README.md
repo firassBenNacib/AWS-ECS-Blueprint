@@ -40,6 +40,7 @@ No modules.
 | rds_sg_id | Security group ID for RDS | `string` | n/a | yes |
 | username | Master username | `string` | n/a | yes |
 | allocated_storage | Allocated storage in GB | `number` | `20` | no |
+| auto_minor_version_upgrade | Enable automatic minor version upgrades for the RDS instance. | `bool` | `true` | no |
 | backup_retention_period | RDS backup retention in days | `number` | `14` | no |
 | deletion_protection | Enable deletion protection on the RDS instance. | `bool` | `true` | no |
 | enable_environment_suffix | Suffix RDS identifiers with environment | `bool` | `false` | no |

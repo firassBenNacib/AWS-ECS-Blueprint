@@ -94,6 +94,19 @@ run "auto_minor_version_upgrade_enabled" {
   }
 }
 
+run "auto_minor_version_upgrade_can_be_disabled" {
+  command = plan
+
+  variables {
+    auto_minor_version_upgrade = false
+  }
+
+  assert {
+    condition     = aws_db_instance.this.auto_minor_version_upgrade == false
+    error_message = "RDS should honor auto_minor_version_upgrade overrides."
+  }
+}
+
 run "enhanced_monitoring_role_created" {
   command = plan
 

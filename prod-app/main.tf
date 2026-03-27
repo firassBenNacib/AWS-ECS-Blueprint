@@ -55,6 +55,7 @@ module "app" {
   alb_certificate_arn                                        = var.alb_certificate_arn
   backend_cache_policy_id                                    = var.backend_cache_policy_id
   backend_origin_request_policy_id                           = var.backend_origin_request_policy_id
+  backend_path_patterns                                      = var.backend_path_patterns
   vpc_name                                                   = var.vpc_name
   availability_zones                                         = var.availability_zones
   vpc_cidr                                                   = var.vpc_cidr
@@ -72,6 +73,7 @@ module "app" {
   rds_engine_version                                         = var.rds_engine_version
   backend_task_cpu_architecture                              = var.backend_task_cpu_architecture
   rds_multi_az                                               = var.rds_multi_az
+  rds_auto_minor_version_upgrade                             = var.rds_auto_minor_version_upgrade
   rds_enable_performance_insights                            = var.rds_enable_performance_insights
   enable_rds_master_user_password_rotation                   = var.enable_rds_master_user_password_rotation
   rds_master_user_password_rotation_automatically_after_days = var.rds_master_user_password_rotation_automatically_after_days

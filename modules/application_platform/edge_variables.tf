@@ -169,6 +169,17 @@ variable "backend_origin_request_policy_id" {
   default     = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 }
 
+variable "backend_path_patterns" {
+  description = "Optional ordered CloudFront path patterns routed to the backend origin. Leave empty to use the blueprint defaults."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for pattern in var.backend_path_patterns : trimspace(pattern) != ""])
+    error_message = "backend_path_patterns must not contain empty values."
+  }
+}
+
 variable "frontend_geo_restriction_type" {
   description = "Frontend CloudFront geo restriction mode: none, whitelist, or blacklist."
   type        = string

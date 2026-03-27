@@ -28,6 +28,12 @@ variable "rds_multi_az" {
   default     = true
 }
 
+variable "rds_auto_minor_version_upgrade" {
+  description = "Enable automatic minor version upgrades for the workload RDS instance."
+  type        = bool
+  default     = true
+}
+
 variable "rds_enable_performance_insights" {
   description = "Enable RDS Performance Insights when the selected instance class supports it."
   type        = bool

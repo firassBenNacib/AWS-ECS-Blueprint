@@ -21,6 +21,7 @@ variable "settings" {
     route53_zone_strategy            = string
     live_validation_dns_label        = string
     live_validation_mode             = bool
+    backend_path_patterns            = list(string)
     bucket_name                      = string
     s3_access_logs_bucket_name       = string
     cloudfront_logs_bucket_name      = string

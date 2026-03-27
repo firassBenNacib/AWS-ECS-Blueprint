@@ -22,6 +22,7 @@ module "deployment_contract" {
     route53_zone_strategy            = var.route53_zone_strategy
     live_validation_dns_label        = var.live_validation_dns_label
     live_validation_mode             = var.live_validation_mode
+    backend_path_patterns            = var.backend_path_patterns
     bucket_name                      = var.bucket_name
     s3_access_logs_bucket_name       = var.s3_access_logs_bucket_name
     cloudfront_logs_bucket_name      = var.cloudfront_logs_bucket_name
@@ -425,6 +426,7 @@ module "app_data" {
     engine_version                                         = var.rds_engine_version
     instance_class                                         = var.rds_instance_class
     multi_az                                               = module.deployment_contract.effective_rds_multi_az
+    auto_minor_version_upgrade                             = var.rds_auto_minor_version_upgrade
     allocated_storage                                      = var.rds_allocated_storage
     max_allocated_storage                                  = var.rds_max_allocated_storage
     manage_master_user_password_rotation                   = var.enable_rds_master_user_password_rotation

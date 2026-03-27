@@ -38,7 +38,11 @@ locals {
     ? ["${local.live_validation_dns_label}.${local.environment_domain}"]
     : ["${local.environment_name}.${local.environment_domain}", "www.${local.environment_name}.${local.environment_domain}"]
   )
-  backend_path_patterns = ["/api/*", "/auth/*", "/audit/*", "/gateway/*", "/notify/twilio/status"]
+  default_backend_path_patterns = ["/api/*", "/auth/*", "/audit/*", "/gateway/*", "/notify/twilio/status"]
+  backend_path_patterns = length(var.settings.backend_path_patterns) > 0 ? distinct([
+    for pattern in var.settings.backend_path_patterns : trimspace(pattern)
+    if trimspace(pattern) != ""
+  ]) : local.default_backend_path_patterns
 
   service_discovery_namespace_name_final = (
     var.settings.service_discovery_namespace_name != null && trimspace(var.settings.service_discovery_namespace_name) != ""
