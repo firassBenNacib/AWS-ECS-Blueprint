@@ -1,0 +1,17 @@
+version: 0.1
+
+projects:
+  - name: prod-app
+    path: prod-app
+    terraform_var_files:
+      - terraform.tfvars.example
+
+  - name: nonprod-app
+    path: nonprod-app
+    terraform_var_files:
+      - terraform.tfvars.example
+
+  - name: live-validation-bootstrap
+    path: live-validation-bootstrap
+    terraform_var_files:
+      - terraform.tfvars.example
