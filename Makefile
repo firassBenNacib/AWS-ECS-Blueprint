@@ -219,7 +219,7 @@ plan-root: ensure-plugin-cache
 	fi
 	TFVARS="$${TFVARS:-terraform.tfvars}"
 	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" bash "$(INIT_APP_ROOT_SCRIPT)" --root "$${ROOT}"
-	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" $(TF_BIN) -chdir="$${ROOT}" plan -input=false -lock=false -compact-warnings -no-color -var-file="$$TFVARS"
+	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" $(TF_BIN) -chdir="$${ROOT}" plan -input=false -lock-timeout=5m -compact-warnings -no-color -var-file="$$TFVARS"
 
 .PHONY: plan-roots plan-all
 plan-roots plan-all: ensure-plugin-cache
@@ -282,7 +282,7 @@ tag-plan-root tag-report-plan: ensure-plugin-cache
 	PLAN_FILE="$$(mktemp)"
 	trap 'rm -f "$$PLAN_FILE"' EXIT
 	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" bash "$(INIT_APP_ROOT_SCRIPT)" --root "$${ROOT}"
-	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" $(TF_BIN) -chdir="$${ROOT}" plan -input=false -lock=false -refresh=false -compact-warnings -no-color -var-file="$$TFVARS" -out="$$PLAN_FILE" >/dev/null
+	TF_PLUGIN_CACHE_DIR="$(TF_PLUGIN_CACHE_DIR)" $(TF_BIN) -chdir="$${ROOT}" plan -input=false -lock-timeout=5m -refresh=false -compact-warnings -no-color -var-file="$$TFVARS" -out="$$PLAN_FILE" >/dev/null
 	$(TF_BIN) -chdir="$${ROOT}" show -json "$$PLAN_FILE" | python3 "$(TAG_REPORT_SCRIPT)" --input - --source "plan:$${ROOT}" $$STRICT_FLAG $$VERBOSE_UNSUPPORTED_FLAG
 
 .PHONY: tag-state-root tag-report-state

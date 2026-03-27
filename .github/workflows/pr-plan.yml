@@ -248,7 +248,7 @@ jobs:
 
             if [[ -n "${init_args[*]}" ]] && terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" >> "${plan_txt}" 2>&1; then
               set +e
-              terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -out="${plan_bin}" -detailed-exitcode -input=false -lock=false -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+              terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -out="${plan_bin}" -detailed-exitcode -input=false -lock-timeout=5m -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
               exit_code=$?
               set -e
 
