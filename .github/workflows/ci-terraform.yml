@@ -269,7 +269,7 @@ jobs:
             printf 'Terraform tag coverage report\nSource: plan:%s\n\n%s\n' "${{ matrix.path }}" "${{ steps.tag_prereqs.outputs.reason }}" | tee "tag-reports/${{ matrix.slug }}.txt"
             exit 0
           fi
-          STRICT=true make tag-plan-root ROOT="${{ matrix.path }}" TFVARS="${{ matrix.tfvars_file }}" | tee "tag-reports/${{ matrix.slug }}.txt"
+          STRICT=true make tag-plan-root ROOT="${{ matrix.path }}" TFVARS="$(basename "${{ matrix.tfvars_file }}")" | tee "tag-reports/${{ matrix.slug }}.txt"
 
       - name: Upload tag coverage artifact
         if: always()
