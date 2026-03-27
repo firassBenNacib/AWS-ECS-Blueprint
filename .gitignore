@@ -60,6 +60,7 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.infracost/
 .coverage
 .coverage.*
 coverage/
