@@ -1,4 +1,4 @@
-name: Terraform Live Validation
+name: Terratest Live Validation
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
           - prod-app
           - nonprod-app
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 4 * * 0"
 
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Resolve Live Validation Targets
+      - name: Resolve Terratest Targets
         id: targets
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -54,13 +54,13 @@ jobs:
       - resolve-targets
     runs-on: ubuntu-latest
     steps:
-      - name: Report disabled live validation targets
+      - name: Report disabled Terratest targets
         run: |
-          echo "No live-validation targets are currently enabled."
+          echo "No Terratest live-validation targets are currently enabled."
           echo "Configure dedicated validation-only DNS names, ACM certificates, and LIVE_VALIDATION_TFVARS_* secrets before re-enabling this workflow."
 
-  validate:
-    name: validate
+  terratest:
+    name: terratest (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -69,7 +69,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
     concurrency:
-      group: terraform-live-validation-${{ matrix.slug }}
+      group: terratest-live-validation-${{ matrix.slug }}
       cancel-in-progress: false
     steps:
       - name: Checkout
@@ -78,6 +78,12 @@ jobs:
       - name: Setup Terraform
         uses: ./.github/actions/setup-terraform
 
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: tests/terratest/go.mod
+          cache-dependency-path: tests/terratest/go.sum
+
       - name: Resolve Validation Inputs
         id: resolve_inputs
         run: |
@@ -85,12 +91,23 @@ jobs:
             echo "path=${{ matrix.path }}"
             echo "slug=${{ matrix.slug }}"
             echo "label=${{ matrix.label }}"
-            echo "workspace=lv-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}"
+            echo "workspace=tt-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}"
             echo "aws_region=${{ matrix.aws_region }}"
             echo "role_env_var=${{ matrix.role_env_var }}"
             echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}"
             echo "live_validation_smoke_profile=${{ matrix.live_validation_smoke_profile }}"
-            echo "artifact_name=live-validation-${{ matrix.slug }}"
+            echo "artifact_name=terratest-live-validation-${{ matrix.slug }}"
+            echo "log_dir=${RUNNER_TEMP}/terratest-live-validation-${{ matrix.slug }}"
+            case "${{ matrix.slug }}" in
+              prod-app)
+                echo "frontend_ecs_tfvars_env_var=LIVE_VALIDATION_TFVARS_FRONTEND_ECS_PROD_APP"
+                echo "public_alb_restricted_tfvars_env_var=LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_PROD_APP"
+                ;;
+              nonprod-app)
+                echo "frontend_ecs_tfvars_env_var=LIVE_VALIDATION_TFVARS_FRONTEND_ECS_NONPROD_APP"
+                echo "public_alb_restricted_tfvars_env_var=LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_NONPROD_APP"
+                ;;
+            esac
           } >> "${GITHUB_OUTPUT}"
 
       - name: Materialize Validation tfvars
@@ -98,6 +115,10 @@ jobs:
         env:
           LIVE_VALIDATION_TFVARS_PROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_PROD_APP }}
           LIVE_VALIDATION_TFVARS_NONPROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_NONPROD_APP }}
+          LIVE_VALIDATION_TFVARS_FRONTEND_ECS_PROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_FRONTEND_ECS_PROD_APP }}
+          LIVE_VALIDATION_TFVARS_FRONTEND_ECS_NONPROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_FRONTEND_ECS_NONPROD_APP }}
+          LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_PROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_PROD_APP }}
+          LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_NONPROD_APP: ${{ secrets.LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_NONPROD_APP }}
         run: |
           tfvars_env_var="${{ steps.resolve_inputs.outputs.live_validation_tfvars_env_var }}"
           tfvars_content="$(printenv "${tfvars_env_var}" || true)"
@@ -113,12 +134,32 @@ jobs:
             exit 1
           fi
 
-          tfvars_path="${RUNNER_TEMP}/live-validation-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
+          tfvars_path="${RUNNER_TEMP}/terratest-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
           printf '%s\n' "${tfvars_content}" > "${tfvars_path}"
           {
             echo "skip=false"
             echo "tfvars_path=${tfvars_path}"
           } >> "${GITHUB_OUTPUT}"
+
+          frontend_ecs_env_var="${{ steps.resolve_inputs.outputs.frontend_ecs_tfvars_env_var }}"
+          frontend_ecs_content="$(printenv "${frontend_ecs_env_var}" || true)"
+          if [[ -n "${frontend_ecs_content}" ]]; then
+            frontend_ecs_tfvars_path="${RUNNER_TEMP}/terratest-frontend-ecs-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
+            printf '%s\n' "${frontend_ecs_content}" > "${frontend_ecs_tfvars_path}"
+            echo "frontend_ecs_tfvars_path=${frontend_ecs_tfvars_path}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "frontend_ecs_tfvars_path=" >> "${GITHUB_OUTPUT}"
+          fi
+
+          public_alb_env_var="${{ steps.resolve_inputs.outputs.public_alb_restricted_tfvars_env_var }}"
+          public_alb_content="$(printenv "${public_alb_env_var}" || true)"
+          if [[ -n "${public_alb_content}" ]]; then
+            public_alb_tfvars_path="${RUNNER_TEMP}/terratest-public-alb-restricted-${{ steps.resolve_inputs.outputs.slug }}.tfvars"
+            printf '%s\n' "${public_alb_content}" > "${public_alb_tfvars_path}"
+            echo "public_alb_restricted_tfvars_path=${public_alb_tfvars_path}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "public_alb_restricted_tfvars_path=" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Report Scheduled Skip
         if: steps.tfvars.outputs.skip == 'true'
@@ -134,22 +175,28 @@ jobs:
           aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
           aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
 
-      - name: Run Live Validation
+      - name: Run Terratest live validation
         if: steps.tfvars.outputs.skip != 'true'
-        run: |
-          bash .scripts/run_live_validation.sh \
-            --path "${{ steps.resolve_inputs.outputs.path }}" \
-            --workspace "${{ steps.resolve_inputs.outputs.workspace }}" \
-            --tfvars-file "${{ steps.tfvars.outputs.tfvars_path }}" \
-            --aws-region "${{ steps.resolve_inputs.outputs.aws_region }}" \
-            --smoke-profile "${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}" \
-            --log-dir "${RUNNER_TEMP}/live-validation-${{ steps.resolve_inputs.outputs.slug }}"
+        env:
+          E2E_REPO_ROOT: ${{ github.workspace }}
+          E2E_TERRAFORM_ROOT: ${{ github.workspace }}/${{ steps.resolve_inputs.outputs.path }}
+          E2E_TFVARS_FILE: ${{ steps.tfvars.outputs.tfvars_path }}
+          E2E_WORKSPACE: ${{ steps.resolve_inputs.outputs.workspace }}
+          E2E_AWS_REGION: ${{ steps.resolve_inputs.outputs.aws_region }}
+          E2E_SMOKE_PROFILE: ${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}
+          E2E_LOG_DIR: ${{ steps.resolve_inputs.outputs.log_dir }}
+          E2E_TERRATEST_RETRIES: "0"
+          E2E_FRONTEND_ECS_TFVARS_FILE: ${{ steps.tfvars.outputs.frontend_ecs_tfvars_path }}
+          E2E_FRONTEND_ECS_SMOKE_PROFILE: ${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}
+          E2E_PUBLIC_ALB_RESTRICTED_TFVARS_FILE: ${{ steps.tfvars.outputs.public_alb_restricted_tfvars_path }}
+          E2E_PUBLIC_ALB_RESTRICTED_SMOKE_PROFILE: ${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}
+        run: go test ./tests/terratest -run TestLiveValidationE2E -count=1 -timeout 2h -v
 
-      - name: Upload Live Validation Artifact
+      - name: Upload Terratest Artifact
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ steps.resolve_inputs.outputs.artifact_name }}
           retention-days: 14
-          path: ${{ runner.temp }}/live-validation-${{ steps.resolve_inputs.outputs.slug }}/
+          path: ${{ steps.resolve_inputs.outputs.log_dir }}/
           if-no-files-found: ignore

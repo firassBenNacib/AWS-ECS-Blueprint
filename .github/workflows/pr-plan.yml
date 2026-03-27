@@ -131,6 +131,7 @@ jobs:
             echo "role_env_var=${{ matrix.role_env_var }}"
             echo "plan_artifact_name=terraform-pr-plan-${{ matrix.slug }}"
             echo "result_artifact_name=terraform-pr-result-${{ matrix.slug }}"
+            echo "cost_artifact_name=terraform-pr-cost-${{ matrix.slug }}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Check Speculative Plan Prerequisites
@@ -174,17 +175,50 @@ jobs:
           aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
           aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
 
+      - name: Check Infracost Prerequisites
+        id: cost_prereqs
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
+          if [[ -z "${INFRACOST_API_KEY}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing INFRACOST_API_KEY secret"
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "skip=false"
+            echo "reason="
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Setup Infracost
+        if: steps.cost_prereqs.outputs.skip != 'true'
+        uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832 # v3.0.1
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+          currency: USD
+
       - name: Generate Speculative Plan
         id: speculative_plan
         run: |
           artifact_dir="${RUNNER_TEMP}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}"
           mkdir -p "${artifact_dir}"
           plan_txt="${artifact_dir}/tfplan.txt"
+          plan_bin="${artifact_dir}/tfplan.binary"
+          plan_json="${artifact_dir}/tfplan.json"
+          cost_json="${artifact_dir}/infracost.json"
           result_json="${artifact_dir}/result.json"
           status="error"
           add="null"
           change="null"
           destroy="null"
+          cost_status="not_run"
+          cost_reason="null"
+          monthly_cost="null"
+          past_monthly_cost="null"
+          monthly_cost_delta="null"
           exit_code=1
 
           {
@@ -197,17 +231,9 @@ jobs:
           if [[ "${{ steps.plan_prereqs.outputs.skip }}" == "true" ]]; then
             echo "${{ steps.plan_prereqs.outputs.reason }}" >> "${plan_txt}"
             status="skipped"
+            cost_status="skipped"
+            cost_reason="${{ steps.plan_prereqs.outputs.reason }}"
             exit_code=0
-            python3 .scripts/write_json_result.py \
-              --output "${result_json}" \
-              --set label "${{ steps.resolve_inputs.outputs.label }}" \
-              --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
-              --set status "${status}" \
-              --set-nullable-int add "null" \
-              --set-nullable-int change "null" \
-              --set-nullable-int destroy "null" \
-              --set plan_artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}" \
-              --set result_artifact_name "${{ steps.resolve_inputs.outputs.result_artifact_name }}"
           else
             init_args=()
             if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
@@ -226,7 +252,7 @@ jobs:
 
             if [[ -n "${init_args[*]}" ]] && terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" >> "${plan_txt}" 2>&1; then
               set +e
-              terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -detailed-exitcode -input=false -lock=false -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+              terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -out="${plan_bin}" -detailed-exitcode -input=false -lock=false -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
               exit_code=$?
               set -e
 
@@ -240,6 +266,28 @@ jobs:
                 counts="$(python3 .scripts/extract_terraform_plan_counts.py "${plan_txt}")"
                 read -r add change destroy <<< "${counts}"
               fi
+
+              if [[ "${status}" == "changes" || "${status}" == "no_changes" ]]; then
+                if terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -json "${plan_bin}" > "${plan_json}"; then
+                  if [[ "${{ steps.cost_prereqs.outputs.skip }}" == "true" ]]; then
+                    cost_status="skipped"
+                    cost_reason="${{ steps.cost_prereqs.outputs.reason }}"
+                    echo "Skipping Infracost: ${{ steps.cost_prereqs.outputs.reason }}" >> "${plan_txt}"
+                  else
+                    if infracost diff --path "${plan_json}" --format json --out-file "${cost_json}" >> "${plan_txt}" 2>&1; then
+                      read -r monthly_cost past_monthly_cost monthly_cost_delta <<< "$(python3 .scripts/extract_infracost_summary.py "${cost_json}")"
+                      cost_status="estimated"
+                    else
+                      cost_status="error"
+                      cost_reason="Infracost diff failed"
+                    fi
+                  fi
+                else
+                  status="error"
+                  cost_status="error"
+                  cost_reason="terraform show -json failed"
+                fi
+              fi
             fi
           fi
 
@@ -248,14 +296,21 @@ jobs:
             --set label "${{ steps.resolve_inputs.outputs.label }}" \
             --set slug "${{ steps.resolve_inputs.outputs.slug }}" \
             --set status "${status}" \
+            --set cost_status "${cost_status}" \
+            --set-nullable-string cost_reason "${cost_reason}" \
             --set-nullable-int add "${add}" \
             --set-nullable-int change "${change}" \
             --set-nullable-int destroy "${destroy}" \
+            --set-nullable-float monthly_cost "${monthly_cost}" \
+            --set-nullable-float past_monthly_cost "${past_monthly_cost}" \
+            --set-nullable-float monthly_cost_delta "${monthly_cost_delta}" \
             --set plan_artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}" \
-            --set result_artifact_name "${{ steps.resolve_inputs.outputs.result_artifact_name }}"
+            --set result_artifact_name "${{ steps.resolve_inputs.outputs.result_artifact_name }}" \
+            --set cost_artifact_name "${{ steps.resolve_inputs.outputs.cost_artifact_name }}"
           {
             echo "status=${status}"
             echo "exit_code=${exit_code}"
+            echo "cost_status=${cost_status}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Upload Speculative Plan Artifact
@@ -274,6 +329,15 @@ jobs:
           name: ${{ steps.resolve_inputs.outputs.result_artifact_name }}
           retention-days: 14
           path: ${{ runner.temp }}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}/result.json
+          if-no-files-found: ignore
+
+      - name: Upload Infracost Artifact
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.resolve_inputs.outputs.cost_artifact_name }}
+          retention-days: 14
+          path: ${{ runner.temp }}/terraform-pr-plan-${{ steps.resolve_inputs.outputs.slug }}/infracost.json
           if-no-files-found: ignore
 
   comment:
@@ -338,10 +402,12 @@ jobs:
               if data["result"] not in ("success", "skipped")
           }
           result_errors = []
-          for path in sorted(Path("pr-results").glob("*.json")):
+          for path in sorted(Path("pr-results").rglob("*.json")):
               data = json.loads(path.read_text())
               if data.get("status") == "error":
                   result_errors.append(data.get("label", path.name))
+              if data.get("cost_status") == "error":
+                  result_errors.append(f"{data.get('label', path.name)} cost estimate")
           if failures:
               raise SystemExit(f"Plan workflow failures: {failures}")
           if result_errors:

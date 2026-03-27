@@ -100,7 +100,6 @@ def select_changed_targets(catalog: list[dict], changed_files: list[str]) -> lis
             if changed.endswith(".tf") or changed.endswith(".tf.json"):
                 select_all = True
                 break
-            # Unknown repo-root IaC/CI file: fail safe.
             select_all = True
             break
 

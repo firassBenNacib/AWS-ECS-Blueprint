@@ -16,6 +16,9 @@ EOF
 ROOT_DIR=""
 TFVARS_FILE="terraform.tfvars"
 CLEANUP_SECRETS="false"
+ROOT_NAME=""
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+INIT_APP_ROOT_SCRIPT="${SCRIPT_DIR}/init_app_root.sh"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +53,7 @@ if [[ -z "${ROOT_DIR}" ]]; then
 fi
 
 ROOT_DIR="$(cd "${ROOT_DIR}" && pwd)"
+ROOT_NAME="$(basename "${ROOT_DIR}")"
 if [[ "${TFVARS_FILE}" = /* ]]; then
   TFVARS_PATH="${TFVARS_FILE}"
 else
@@ -70,6 +74,40 @@ if ! command -v aws >/dev/null 2>&1; then
   echo "aws CLI is required" >&2
   exit 1
 fi
+
+AWS_PREFLIGHT_TIMEOUT_SECONDS="${AWS_PREFLIGHT_TIMEOUT_SECONDS:-15}"
+
+preflight_aws_access() {
+  if timeout "${AWS_PREFLIGHT_TIMEOUT_SECONDS}" aws sts get-caller-identity --output json >/dev/null 2>&1; then
+    return 0
+  fi
+
+  cat >&2 <<EOF
+AWS credential preflight failed or timed out for ${ROOT_NAME}.
+The current shell is not reaching AWS STS quickly enough for a safe destroy.
+
+Check one of these before retrying:
+  1. You are logged in to the intended AWS profile/session
+  2. AWS_PROFILE is set correctly
+  3. AWS_REGION/AWS_DEFAULT_REGION is set if your auth flow needs it
+  4. Your shell is not hanging on instance metadata lookup
+
+Quick manual check:
+  aws sts get-caller-identity
+EOF
+  exit 1
+}
+
+ensure_backend_initialized() {
+  if ! TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-}" bash "${INIT_APP_ROOT_SCRIPT}" --root "${ROOT_DIR}" --require-backend >/dev/null; then
+    cat >&2 <<EOF
+Failed to initialize Terraform for ${ROOT_NAME}.
+Run this once and retry:
+  make init-root ROOT=${ROOT_NAME}
+EOF
+    exit 1
+  fi
+}
 
 read_tfvar() {
   local key="$1"
@@ -106,8 +144,12 @@ fi
 
 ENVIRONMENT_PREFIX=""
 case "$(basename "${ROOT_DIR}")" in
-  prod-app) ENVIRONMENT_PREFIX="prod/" ;;
-  nonprod-app) ENVIRONMENT_PREFIX="nonprod/" ;;
+  prod-app)
+    ENVIRONMENT_PREFIX="prod/"
+    ;;
+  nonprod-app)
+    ENVIRONMENT_PREFIX="nonprod/"
+    ;;
 esac
 
 OVERRIDE_FILE="$(mktemp)"
@@ -397,6 +439,8 @@ cleanup_secrets() {
   fi
 }
 
+preflight_aws_access
+ensure_backend_initialized
 disable_alb_deletion_protection
 disable_rds_deletion_protection
 delete_existing_rds_final_snapshot
@@ -411,5 +455,3 @@ terraform -chdir="${ROOT_DIR}" destroy \
   -var-file="${OVERRIDE_FILE}"
 
 cleanup_secrets
-
-echo "Safe destroy completed for ${ROOT_DIR}"

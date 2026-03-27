@@ -10,6 +10,7 @@ TFSEC_MIN_SEVERITY="${TFSEC_MIN_SEVERITY:-HIGH}"
 TFSEC_STRICT_ALLOWLIST="${TFSEC_STRICT_ALLOWLIST:-}"
 TFSEC_ALLOWLIST_FILE="${ALLOWLIST_DIR}/tfsec_ignored_high_allowlist.txt"
 TFSEC_EXCLUDE_PATHS="${TFSEC_EXCLUDE_PATHS:-}"
+ROOT_LABEL="${WORKDIR}"
 
 if [[ -z "${TFSEC_EXCLUDE_PATHS}" && "${WORKDIR}" == "." ]]; then
   TFSEC_EXCLUDE_PATHS="nonprod-app,prod-app"
@@ -42,7 +43,7 @@ test -f "${TFSEC_ALLOWLIST_FILE}" || {
   exit 1
 }
 
-echo "Running tfsec (unsuppressed findings must be zero)..."
+echo "[root:${ROOT_LABEL}][tfsec:gate] Running tfsec (unsuppressed findings must be zero)..."
 TFSEC_ARGS=(
   "${WORKDIR}"
   "--tfvars-file" "${TFVARS_FILE}"
@@ -62,9 +63,9 @@ if [[ -n "${TFSEC_EXCLUDE_PATHS}" ]]; then
   done
 fi
 
-tfsec "${TFSEC_ARGS[@]}"
+tfsec "${TFSEC_ARGS[@]}" 2>&1 | sed -e '/^$/d' -e "s/^/[root:${ROOT_LABEL}][tfsec:gate] /"
 
-echo "Running tfsec (include ignored for allowlist enforcement)..."
+echo "[root:${ROOT_LABEL}][tfsec:allowlist] Running tfsec (include ignored for allowlist enforcement)..."
 TFSEC_IGNORED_ARGS=(
   "${WORKDIR}"
   "--tfvars-file" "${TFVARS_FILE}"
@@ -85,9 +86,11 @@ if [[ -n "${TFSEC_EXCLUDE_PATHS}" ]]; then
   done
 fi
 
-tfsec "${TFSEC_IGNORED_ARGS[@]}" || true
+if ! tfsec "${TFSEC_IGNORED_ARGS[@]}" 2>&1 | sed -e '/^$/d' -e "s/^/[root:${ROOT_LABEL}][tfsec:allowlist] /"; then
+  :
+fi
 
-python3 - "${OUT_DIR}/tfsec.include_ignored.json" "${TFSEC_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${TFSEC_STRICT_ALLOWLIST}" <<'PY'
+python3 - "${OUT_DIR}/tfsec.include_ignored.json" "${TFSEC_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${TFSEC_STRICT_ALLOWLIST}" "${WORKDIR}" "${TFSEC_EXCLUDE_PATHS}" <<'PY' | sed -e '/^$/d' -e "s/^/[root:${ROOT_LABEL}][tfsec:policy] /"
 import json
 import re
 import sys
@@ -98,11 +101,35 @@ tfsec_json = Path(sys.argv[1])
 allowlist_file = Path(sys.argv[2])
 max_allowlist_days = int(sys.argv[3])
 strict_allowlist = sys.argv[4].lower() == "true"
+workdir = Path(sys.argv[5]).resolve()
+exclude_paths_arg = sys.argv[6]
 
 data = json.loads(tfsec_json.read_text())
 results = data.get("results", [])
 
-ignored = [r for r in results if r.get("status") == 2]
+excluded_paths = []
+for raw in exclude_paths_arg.split(","):
+    item = raw.strip()
+    if not item:
+        continue
+    excluded_paths.append((workdir / item).resolve())
+
+def is_excluded(finding: dict) -> bool:
+    loc = finding.get("location", {})
+    filename = loc.get("filename", "")
+    if not filename:
+        return False
+
+    path = Path(filename).resolve()
+    for excluded in excluded_paths:
+      try:
+          path.relative_to(excluded)
+          return True
+      except ValueError:
+          continue
+    return False
+
+ignored = [r for r in results if r.get("status") == 2 and not is_excluded(r)]
 ignored_high_locations = {}
 for finding in ignored:
     if finding.get("severity") != "HIGH":

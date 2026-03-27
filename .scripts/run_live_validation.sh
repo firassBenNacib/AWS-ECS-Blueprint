@@ -71,6 +71,7 @@ cleanup() {
         -auto-approve \
         -input=false \
         -state="${state_file}" \
+        -var="live_validation_mode=true" \
         -var-file="${TFVARS_FILE}" > "${LOG_DIR}/destroy.log" 2>&1
       destroy_status=$?
     fi
@@ -93,6 +94,7 @@ TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" apply \
   -auto-approve \
   -input=false \
   -state="${state_file}" \
+  -var="live_validation_mode=true" \
   -var-file="${TFVARS_FILE}" > "${LOG_DIR}/apply.log" 2>&1
 bash .scripts/run_live_validation_checks.sh \
   --path "${PATH_ARG}" \
