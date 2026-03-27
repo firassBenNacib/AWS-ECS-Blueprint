@@ -85,9 +85,20 @@ jobs:
 
       - name: Resolve Inputs
         id: resolve_inputs
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
         run: |
           tfvars_source="repository"
           tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
+          tfvars_env_var="${{ matrix.tfvars_env_var }}"
+          tfvars_secret="$(printenv "${tfvars_env_var}" || true)"
+
+          if [[ -n "${tfvars_secret}" ]]; then
+            tfvars_source="github-secret"
+            tfvars_abs="${RUNNER_TEMP}/${{ matrix.slug }}.tfvars"
+            printf '%s\n' "${tfvars_secret}" > "${tfvars_abs}"
+          fi
 
           {
             echo "path=${{ matrix.path }}"
@@ -252,6 +263,10 @@ jobs:
                     if infracost diff --path "${plan_json}" --format json --out-file "${cost_json}" >> "${plan_txt}" 2>&1; then
                       read -r monthly_cost past_monthly_cost monthly_cost_delta <<< "$(python3 .scripts/extract_infracost_summary.py "${cost_json}")"
                       cost_status="estimated"
+                      if [[ "${status}" == "no_changes" ]]; then
+                        past_monthly_cost="${monthly_cost}"
+                        monthly_cost_delta="0"
+                      fi
                     else
                       cost_status="error"
                       cost_reason="Infracost diff failed"
