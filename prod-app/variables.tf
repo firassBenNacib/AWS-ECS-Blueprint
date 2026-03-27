@@ -236,7 +236,7 @@ variable "rds_instance_class" {
 variable "rds_engine_version" {
   description = "RDS engine version for the production database."
   type        = string
-  default     = "8.0.40"
+  default     = "8.0.45"
 }
 
 variable "rds_enable_performance_insights" {

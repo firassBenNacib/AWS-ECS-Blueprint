@@ -83,7 +83,7 @@ variable "dr_s3_kms_key_id" {
 variable "enable_s3_lifecycle" {
   description = "Enable lifecycle rules on the frontend S3 bucket"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "s3_lifecycle_expiration_days" {

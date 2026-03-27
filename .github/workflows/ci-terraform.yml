@@ -46,6 +46,8 @@ env:
   TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
   TF_CLI_ARGS_plan: "-input=false -lock-timeout=5m"
   TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
   CHECKOV_VERSION: "3.2.507"
   TFSEC_VERSION: "v1.28.14"
   TERRASCAN_VERSION: "1.19.9"

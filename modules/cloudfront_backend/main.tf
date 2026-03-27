@@ -2,7 +2,9 @@ locals {
   environment_name = (
     var.environment_name_override != null && trimspace(var.environment_name_override) != ""
   ) ? trimspace(var.environment_name_override) : terraform.workspace
-  environment_tag = var.enable_environment_suffix ? upper(local.environment_name) : "DEFAULT"
+  environment_tag = var.enable_environment_suffix ? (
+    local.environment_name == "prod" ? "Prod" : local.environment_name == "nonprod" ? "Stage" : title(local.environment_name)
+  ) : "Default"
   use_origin_group = var.enable_origin_failover && (
     trimspace(var.backend_failover_domain_name) != "" &&
     trimspace(var.backend_failover_domain_name) != trimspace(var.backend_domain_name)

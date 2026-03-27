@@ -163,7 +163,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | enable_rds_iam_auth | Enable IAM database authentication for RDS MySQL | `bool` | `true` | no |
 | enable_rds_master_user_password_rotation | Enable automatic rotation for the RDS-managed master user password. | `bool` | `true` | no |
 | enable_s3_access_logging | Enable S3 server access logging for primary S3 buckets | `bool` | `true` | no |
-| enable_s3_lifecycle | Enable lifecycle rules on the frontend S3 bucket | `bool` | `false` | no |
+| enable_s3_lifecycle | Enable lifecycle rules on the frontend S3 bucket | `bool` | `true` | no |
 | enable_security_baseline | Enable account-level production security baseline controls (CloudTrail, Config, GuardDuty, Security Hub, Access Analyzer). | `bool` | `true` | no |
 | environment_name_override | Optional explicit environment name used for naming and DNS derivation. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
 | frontend_cache_policy_id | CloudFront cache policy ID for frontend distribution | `string` | `"658327ea-f89d-4fab-a63d-7e88639e58f6"` | no |
@@ -195,8 +195,8 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | rds_db_name | Database name | `string` | `"app"` | no |
 | rds_deletion_protection | Enable RDS deletion protection during normal operation. | `bool` | `true` | no |
 | rds_enable_performance_insights | Enable RDS Performance Insights when the selected instance class supports it. | `bool` | `false` | no |
-| rds_enabled_cloudwatch_logs_exports | RDS MySQL log types exported to CloudWatch Logs | `list(string)` | <pre>[<br/>  "error",<br/>  "general",<br/>  "slowquery"<br/>]</pre> | no |
-| rds_engine_version | RDS engine version for the workload MySQL instance. | `string` | `"8.0.40"` | no |
+| rds_enabled_cloudwatch_logs_exports | RDS MySQL log types exported to CloudWatch Logs | `list(string)` | <pre>[<br/>  "audit",<br/>  "error",<br/>  "general",<br/>  "slowquery"<br/>]</pre> | no |
+| rds_engine_version | RDS engine version for the workload MySQL instance. | `string` | `"8.0.45"` | no |
 | rds_final_snapshot_identifier | Optional final snapshot identifier | `string` | `null` | no |
 | rds_identifier | RDS instance identifier | `string` | `"app-rds"` | no |
 | rds_instance_class | RDS instance class | `string` | `"db.t4g.micro"` | no |

@@ -236,7 +236,7 @@ variable "rds_instance_class" {
 variable "rds_engine_version" {
   description = "RDS engine version for the non-production database."
   type        = string
-  default     = "8.0.40"
+  default     = "8.0.45"
 }
 
 variable "rds_enable_performance_insights" {
@@ -248,7 +248,7 @@ variable "rds_enable_performance_insights" {
 variable "rds_multi_az" {
   description = "Enable Multi-AZ deployment for the non-production RDS instance."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_rds_master_user_password_rotation" {

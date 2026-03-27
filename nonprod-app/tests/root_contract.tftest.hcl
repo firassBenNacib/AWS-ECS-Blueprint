@@ -103,6 +103,7 @@ variables {
   backend_origin_request_policy_id         = "216adef6-5c7f-47e4-b989-5492eafa07d3"
   backend_container_image                  = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/app-backend-nonprod@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   enable_origin_auth_header                = false
+  origin_auth_header_ssm_parameter_name    = "/example-app/nonprod/origin-auth/current"
   enable_security_baseline                 = false
   enable_account_security_controls         = false
   enable_aws_config                        = false
@@ -165,7 +166,7 @@ run "nonprod_root_can_model_the_low_cost_profile" {
   }
 
   assert {
-    condition     = module.app.representative_resource_tags["rds"]["Environment"] == "nonprod"
+    condition     = module.app.representative_resource_tags["rds"]["Environment"] == "Stage"
     error_message = "The nonprod root should apply the environment tag to the RDS instance."
   }
 

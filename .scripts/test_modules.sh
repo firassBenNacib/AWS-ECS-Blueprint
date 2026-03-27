@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TF_BIN="${TF_BIN:-terraform}"
 PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-${ROOT_DIR}/.terraform.d/plugin-cache}"
-INIT_ARGS=(-backend=false -input=false -lockfile=readonly)
+INIT_ARGS=(-backend=false -input=false)
 INIT_TIMEOUT_SECONDS="${MODULE_INIT_TIMEOUT_SECONDS:-180}"
 TEST_TIMEOUT_SECONDS="${MODULE_TEST_TIMEOUT_SECONDS:-300}"
 MODULE_FILTER="${1:-}"

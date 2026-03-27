@@ -10,7 +10,9 @@ locals {
     ) : []
   )
 
-  environment_tag = var.enable_environment_suffix ? upper(local.environment_name) : "DEFAULT"
+  environment_tag = var.enable_environment_suffix ? (
+    local.environment_name == "prod" ? "Prod" : local.environment_name == "nonprod" ? "Stage" : title(local.environment_name)
+  ) : "Default"
   oac_name = var.enable_environment_suffix ? format(
     "frontend-oac-%s-%s",
     local.environment_name,

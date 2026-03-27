@@ -85,34 +85,9 @@ jobs:
 
       - name: Resolve Inputs
         id: resolve_inputs
-        env:
-          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
-          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
         run: |
-          tfvars_abs=""
           tfvars_source="repository"
-          case "${{ matrix.slug }}" in
-            prod-app)
-              if [[ -n "${TFVARS_PROD_APP}" ]]; then
-                tfvars_abs="${RUNNER_TEMP}/tfvars-prod-app.auto.tfvars"
-                printf '%s' "${TFVARS_PROD_APP}" > "${tfvars_abs}"
-                chmod 600 "${tfvars_abs}"
-                tfvars_source="secret"
-              fi
-              ;;
-            nonprod-app)
-              if [[ -n "${TFVARS_NONPROD_APP}" ]]; then
-                tfvars_abs="${RUNNER_TEMP}/tfvars-nonprod-app.auto.tfvars"
-                printf '%s' "${TFVARS_NONPROD_APP}" > "${tfvars_abs}"
-                chmod 600 "${tfvars_abs}"
-                tfvars_source="secret"
-              fi
-              ;;
-          esac
-
-          if [[ -z "${tfvars_abs}" ]]; then
-            tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
-          fi
+          tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
 
           {
             echo "path=${{ matrix.path }}"
@@ -313,6 +288,10 @@ jobs:
             echo "cost_status=${cost_status}"
           } >> "${GITHUB_OUTPUT}"
 
+          if [[ "${status}" == "error" ]]; then
+            exit 1
+          fi
+
       - name: Upload Speculative Plan Artifact
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -406,8 +385,6 @@ jobs:
               data = json.loads(path.read_text())
               if data.get("status") == "error":
                   result_errors.append(data.get("label", path.name))
-              if data.get("cost_status") == "error":
-                  result_errors.append(f"{data.get('label', path.name)} cost estimate")
           if failures:
               raise SystemExit(f"Plan workflow failures: {failures}")
           if result_errors:

@@ -66,10 +66,43 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
       days = var.logging.cloudfront_logs_expiration_days
     }
 
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
     abort_incomplete_multipart_upload {
       days_after_initiation = var.logging.cloudfront_logs_abort_incomplete_multipart_upload_days
     }
   }
+}
+
+data "aws_iam_policy_document" "cloudfront_logs_bucket_policy" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.cloudfront_logs.arn,
+      "${aws_s3_bucket.cloudfront_logs.arn}/*"
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  policy = data.aws_iam_policy_document.cloudfront_logs_bucket_policy.json
 }
 
 resource "aws_s3_bucket_logging" "cloudfront_logs" {
@@ -158,6 +191,36 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs_dr" {
       days_after_initiation = 7
     }
   }
+}
+
+data "aws_iam_policy_document" "cloudfront_logs_dr_bucket_policy" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.cloudfront_logs_dr.arn,
+      "${aws_s3_bucket.cloudfront_logs_dr.arn}/*"
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "cloudfront_logs_dr" {
+  provider = aws.dr
+  bucket   = aws_s3_bucket.cloudfront_logs_dr.id
+  policy   = data.aws_iam_policy_document.cloudfront_logs_dr_bucket_policy.json
 }
 
 resource "aws_s3_bucket_logging" "cloudfront_logs_dr" {

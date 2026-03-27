@@ -15,7 +15,8 @@ provider "aws" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = "nonprod"
+        Environment = "Stage"
+        Service     = var.project_name
       },
       local.contract_tags
     )
@@ -40,7 +41,8 @@ provider "aws" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = "nonprod"
+        Environment = "Stage"
+        Service     = var.project_name
       },
       local.contract_tags
     )
@@ -65,7 +67,8 @@ provider "aws" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = "nonprod"
+        Environment = "Stage"
+        Service     = var.project_name
       },
       local.contract_tags
     )

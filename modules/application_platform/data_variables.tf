@@ -19,7 +19,7 @@ variable "rds_instance_class" {
 variable "rds_engine_version" {
   description = "RDS engine version for the workload MySQL instance."
   type        = string
-  default     = "8.0.40"
+  default     = "8.0.45"
 }
 
 variable "rds_multi_az" {
@@ -103,7 +103,7 @@ variable "rds_monitoring_interval_seconds" {
 variable "rds_enabled_cloudwatch_logs_exports" {
   description = "RDS MySQL log types exported to CloudWatch Logs"
   type        = list(string)
-  default     = ["error", "general", "slowquery"]
+  default     = ["audit", "error", "general", "slowquery"]
 }
 
 variable "rds_username" {

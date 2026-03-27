@@ -51,7 +51,8 @@ output "representative_resource_tags" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = module.deployment_contract.environment_name
+        Environment = module.deployment_contract.environment_name == "prod" ? "Prod" : module.deployment_contract.environment_name == "nonprod" ? "Stage" : title(module.deployment_contract.environment_name)
+        Service     = var.project_name
         Name        = var.vpc_name
       },
       var.resource_contract_tags
@@ -60,7 +61,8 @@ output "representative_resource_tags" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = module.deployment_contract.environment_name
+        Environment = module.deployment_contract.environment_name == "prod" ? "Prod" : module.deployment_contract.environment_name == "nonprod" ? "Stage" : title(module.deployment_contract.environment_name)
+        Service     = var.project_name
         Name        = module.app_data.instance_identifier
       },
       var.resource_contract_tags
@@ -69,7 +71,8 @@ output "representative_resource_tags" {
       {
         ManagedBy   = "Terraform"
         Project     = var.project_name
-        Environment = module.deployment_contract.environment_name
+        Environment = module.deployment_contract.environment_name == "prod" ? "Prod" : module.deployment_contract.environment_name == "nonprod" ? "Stage" : title(module.deployment_contract.environment_name)
+        Service     = var.project_name
         Name        = module.deployment_contract.enable_environment_suffix ? "cloudfront-frontend-${module.deployment_contract.environment_name}" : "cloudfront-frontend"
       },
       var.resource_contract_tags

@@ -103,6 +103,7 @@ variables {
   backend_origin_request_policy_id         = "216adef6-5c7f-47e4-b989-5492eafa07d3"
   backend_container_image                  = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/app-backend-prod@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   enable_origin_auth_header                = false
+  origin_auth_header_ssm_parameter_name    = "/example-app/prod/origin-auth/current"
   enable_security_baseline                 = false
   enable_account_security_controls         = false
   enable_aws_config                        = false
@@ -143,7 +144,7 @@ run "prod_root_preserves_default_contract" {
   }
 
   assert {
-    condition     = module.app.representative_resource_tags["rds"]["Environment"] == "prod"
+    condition     = module.app.representative_resource_tags["rds"]["Environment"] == "Prod"
     error_message = "The prod root should apply the environment tag to the RDS instance."
   }
 
