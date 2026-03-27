@@ -99,35 +99,7 @@ jobs:
             tfvars_source="github-secret"
             tfvars_abs="${RUNNER_TEMP}/${{ matrix.slug }}.tfvars"
             printf '%s\n' "${tfvars_secret}" > "${tfvars_abs}"
-
-            legacy_adjustments="$(
-              python3 - "${tfvars_abs}" <<'PY'
-import pathlib
-import re
-import sys
-
-path = pathlib.Path(sys.argv[1])
-text = path.read_text()
-changes = []
-
-updated = re.sub(
-    r'(?m)^(\s*backend_origin_protocol_policy\s*=\s*)"http-only"(\s*(?:#.*)?)$',
-    r'\1"https-only"\2',
-    text,
-)
-if updated != text:
-    changes.append("normalized backend_origin_protocol_policy=http-only to https-only")
-    text = updated
-
-updated = re.sub(r'(?m)^\s*backend_failover_domain_name\s*=.*(?:\n|$)', "", text)
-if updated != text:
-    changes.append("removed legacy backend_failover_domain_name input")
-    text = updated
-
-path.write_text(text)
-print("; ".join(changes))
-PY
-            )"
+            legacy_adjustments="$(python3 .scripts/normalize_legacy_tfvars_for_ci.py "${tfvars_abs}")"
 
             if [[ -n "${legacy_adjustments}" ]]; then
               echo "::warning::Adjusted legacy tfvars for ${{ matrix.label }}: ${legacy_adjustments}"
