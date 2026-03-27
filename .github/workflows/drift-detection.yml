@@ -1,0 +1,180 @@
+name: Detect Terraform Drift
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Optional single target to check"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - prod-app
+          - nonprod-app
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
+
+jobs:
+  resolve-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      count: ${{ steps.targets.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Drift Target Matrix
+        id: targets
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.target }}" != "all" ]]; then
+            matrix="$(python3 .scripts/terraform_target_matrix.py --mode single --target "${{ github.event.inputs.target }}" --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py --mode single --target "${{ github.event.inputs.target }}" --output-format count)"
+          else
+            matrix="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format json)"
+            count="$(python3 .scripts/terraform_target_matrix.py --mode full --output-format count)"
+          fi
+          {
+            echo "matrix=${matrix}"
+            echo "count=${count}"
+          } >> "${GITHUB_OUTPUT}"
+
+  drift-plan:
+    name: drift-plan (${{ matrix.label }})
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Resolve Inputs
+        id: resolve_inputs
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
+        run: |
+          tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
+          tfvars_env_var="${{ matrix.tfvars_env_var }}"
+          tfvars_secret="$(printenv "${tfvars_env_var}" || true)"
+          if [[ -n "${tfvars_secret}" ]]; then
+            tfvars_abs="${RUNNER_TEMP}/${{ matrix.slug }}.tfvars"
+            printf '%s\n' "${tfvars_secret}" > "${tfvars_abs}"
+            python3 .scripts/normalize_legacy_tfvars_for_ci.py "${tfvars_abs}" >/dev/null
+          fi
+
+          {
+            echo "path=${{ matrix.path }}"
+            echo "slug=${{ matrix.slug }}"
+            echo "label=${{ matrix.label }}"
+            echo "tfvars_abs=${tfvars_abs}"
+            if [[ -f "${{ matrix.backend_config_file }}" ]]; then
+              echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
+            else
+              echo "backend_cfg_abs="
+            fi
+            echo "backend_key=${{ matrix.backend_key }}"
+            echo "backend_region=${{ matrix.backend_region }}"
+            echo "aws_region=${{ matrix.aws_region }}"
+            echo "role_env_var=${{ matrix.role_env_var }}"
+            echo "artifact_name=terraform-drift-${{ matrix.slug }}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Check Drift Prerequisites
+        id: prereqs
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+          TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+        run: |
+          role_env_var="${{ steps.resolve_inputs.outputs.role_env_var }}"
+          role_arn="$(printenv "${role_env_var}" || true)"
+
+          if [[ -z "${role_arn}" ]]; then
+            echo "Missing AWS role secret for ${{ steps.resolve_inputs.outputs.label }}" >&2
+            exit 1
+          fi
+
+          if [[ -z "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" && -z "${TF_BACKEND_BUCKET}" ]]; then
+            echo "Missing TF_BACKEND_BUCKET repo variable" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ steps.resolve_inputs.outputs.role_env_var }}
+          role_label: ${{ steps.resolve_inputs.outputs.label }}
+          aws_region: ${{ steps.resolve_inputs.outputs.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Detect Drift
+        run: |
+          artifact_dir="${RUNNER_TEMP}/terraform-drift-${{ steps.resolve_inputs.outputs.slug }}"
+          mkdir -p "${artifact_dir}"
+          plan_txt="${artifact_dir}/drift-plan.txt"
+          plan_bin="${artifact_dir}/drift-plan.binary"
+          init_args=()
+
+          if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
+            init_args+=("-backend-config=${{ steps.resolve_inputs.outputs.backend_cfg_abs }}")
+          else
+            backend_region="${TF_BACKEND_REGION:-${{ steps.resolve_inputs.outputs.backend_region }}}"
+            init_args+=("-backend-config=bucket=${TF_BACKEND_BUCKET}")
+            init_args+=("-backend-config=key=${{ steps.resolve_inputs.outputs.backend_key }}")
+            init_args+=("-backend-config=region=${backend_region}")
+            init_args+=("-backend-config=encrypt=true")
+          fi
+
+          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" > "${plan_txt}" 2>&1
+
+          set +e
+          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -detailed-exitcode -input=false -lock=false -out="${plan_bin}" -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+          exit_code=$?
+          set -e
+
+          case "${exit_code}" in
+            0)
+              echo "No drift detected for ${{ steps.resolve_inputs.outputs.label }}" >> "${plan_txt}"
+              ;;
+            2)
+              echo "Drift detected for ${{ steps.resolve_inputs.outputs.label }}" >> "${plan_txt}"
+              exit 1
+              ;;
+            *)
+              echo "Terraform plan failed for ${{ steps.resolve_inputs.outputs.label }}" >> "${plan_txt}"
+              exit "${exit_code}"
+              ;;
+          esac
+
+      - name: Upload Drift Artifact
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.resolve_inputs.outputs.artifact_name }}
+          path: ${{ runner.temp }}/${{ steps.resolve_inputs.outputs.artifact_name }}
+          if-no-files-found: warn

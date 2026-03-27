@@ -242,6 +242,7 @@ The repository uses a focused workflow set under [`.github/workflows/`](./.githu
 - `ci-terraform.yml`: Terraform formatting, validation, linting, and security scanning
 - `dependency-review.yml`: dependency and supply-chain review on pull requests
 - `pr-plan.yml`: speculative Terraform plans for pull requests
+- `drift-detection.yml`: weekly or on-demand plan-only drift detection against live backend state
 - `deploy.yml`: saved-plan deployment flow with GitHub environment approval
 - `destroy.yml`: manual destroy flow with typed confirmation and GitHub environment approval
 - `live-validation.yml`: scheduled or manual apply/smoke/destroy validation runs
@@ -266,6 +267,8 @@ Optional repository secrets:
 
 - `INFRACOST_API_KEY` for pull request monthly-cost estimates in `pr-plan.yml`
 - `LIVE_VALIDATION_TFVARS_*` only when you intentionally enable live-validation workflows
+
+The checked-in [`infracost.yml`](./infracost.yml) is kept for local `infracost breakdown` usage. The GitHub PR workflow intentionally uses speculative Terraform plan JSON plus repo-secret tfvars instead of that file so the PR cost comment tracks the actual target inputs more closely.
 
 GitHub environment-scoped secrets and variables are optional in the current workflow design. The default workflow path reads the repo-level values above, while environments are still useful for approvals, isolation, and future stricter secret scoping.
 

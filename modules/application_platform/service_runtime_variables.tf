@@ -246,7 +246,7 @@ variable "enable_ecs_exec" {
 }
 
 variable "enable_ecs_exec_audit_alerts" {
-  description = "When true, route ECS Exec shell access events to the security notifications topic in production."
+  description = "When true, route ECS Exec shell access events to the security notifications topic in production when account-level security controls are enabled."
   type        = bool
   default     = true
 }

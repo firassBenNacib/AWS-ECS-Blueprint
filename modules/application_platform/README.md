@@ -50,12 +50,12 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | acm_cert_frontend | ACM certificate ARN for frontend CloudFront distribution (must be us-east-1) | `string` | n/a | yes |
+| alb_certificate_arn | Regional ACM certificate ARN for the ALB HTTPS listener (can be imported from Let's Encrypt) | `string` | n/a | yes |
 | bucket_name | Name of the frontend S3 bucket | `string` | n/a | yes |
 | environment_domain | Base domain used for environment-derived aliases (for example: example.com). | `string` | n/a | yes |
 | project_name | Required project name applied to resource names, tags, and internal DNS defaults. | `string` | n/a | yes |
 | rds_username | RDS master username | `string` | n/a | yes |
 | alb_access_logs_prefix | S3 prefix for ALB access logs | `string` | `"alb/"` | no |
-| alb_certificate_arn | Regional ACM certificate ARN for the ALB HTTPS listener (can be imported from Let's Encrypt) | `string` | `null` | no |
 | alb_deletion_protection | Enable ALB deletion protection (required in this production-only configuration) | `bool` | `true` | no |
 | alb_health_check_healthy_threshold | ALB target group healthy threshold count | `number` | `2` | no |
 | alb_health_check_interval_seconds | ALB target group health check interval (seconds) | `number` | `30` | no |
@@ -155,7 +155,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | enable_cloudtrail_data_events | Enable CloudTrail data event selectors for high-value resource telemetry. | `bool` | `false` | no |
 | enable_cost_optimized_dev_tier | Enable a lower-cost dev tier profile that reduces account-level controls, forces private-app NAT to disabled, and uses single-AZ RDS. | `bool` | `false` | no |
 | enable_ecs_exec | Enable ECS Exec for break-glass debugging access. | `bool` | `false` | no |
-| enable_ecs_exec_audit_alerts | When true, route ECS Exec shell access events to the security notifications topic in production. | `bool` | `true` | no |
+| enable_ecs_exec_audit_alerts | When true, route ECS Exec shell access events to the security notifications topic in production when account-level security controls are enabled. | `bool` | `true` | no |
 | enable_environment_suffix | Append the effective environment name to shared resource names. Keep enabled for dedicated per-environment roots. | `bool` | `true` | no |
 | enable_inspector | Enable Amazon Inspector for account-level vulnerability scanning. | `bool` | `true` | no |
 | enable_managed_waf | Create and attach default managed-rule WAF ACLs when explicit ARNs are not provided | `bool` | `true` | no |
