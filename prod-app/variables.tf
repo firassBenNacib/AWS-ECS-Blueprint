@@ -222,6 +222,12 @@ variable "backend_origin_request_policy_id" {
   type        = string
 }
 
+variable "backend_path_patterns" {
+  description = "Optional ordered CloudFront path patterns routed to the backend origin. Leave empty to use the blueprint defaults."
+  type        = list(string)
+  default     = []
+}
+
 variable "rds_username" {
   description = "RDS master username for production database."
   type        = string
@@ -253,6 +259,12 @@ variable "rds_enable_performance_insights" {
 
 variable "rds_multi_az" {
   description = "Enable Multi-AZ deployment for the production RDS instance."
+  type        = bool
+  default     = true
+}
+
+variable "rds_auto_minor_version_upgrade" {
+  description = "Enable automatic minor version upgrades for the production RDS instance."
   type        = bool
   default     = true
 }

@@ -56,6 +56,12 @@ variable "multi_az" {
   default     = true
 }
 
+variable "auto_minor_version_upgrade" {
+  description = "Enable automatic minor version upgrades for the RDS instance."
+  type        = bool
+  default     = true
+}
+
 variable "allocated_storage" {
   description = "Allocated storage in GB"
   type        = number

@@ -233,6 +233,24 @@ run "public_alb_restricted_uses_public_edge_subnets_for_alb" {
   }
 }
 
+run "custom_backend_path_patterns_override_defaults" {
+  command = plan
+
+  variables {
+    backend_path_patterns = ["/api/*", "/internal/*", "/status/*"]
+  }
+
+  assert {
+    condition     = jsonencode(module.deployment_contract.backend_path_patterns) == jsonencode(["/api/*", "/internal/*", "/status/*"])
+    error_message = "Custom backend path patterns should override the deployment contract defaults."
+  }
+
+  assert {
+    condition     = jsonencode(module.edge_contract.backend_path_patterns) == jsonencode(["/api/*", "/internal/*", "/status/*"])
+    error_message = "Custom backend path patterns should flow through the edge contract."
+  }
+}
+
 run "budget_alerts_can_be_enabled_for_operability_visibility" {
   command = plan
 

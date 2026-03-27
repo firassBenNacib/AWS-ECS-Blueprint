@@ -10,6 +10,7 @@ module "rds" {
   engine_version                  = var.data.engine_version
   instance_class                  = var.data.instance_class
   multi_az                        = var.data.multi_az
+  auto_minor_version_upgrade      = var.data.auto_minor_version_upgrade
   allocated_storage               = var.data.allocated_storage
   max_allocated_storage           = var.data.max_allocated_storage
   backup_retention_period         = var.data.backup_retention_period

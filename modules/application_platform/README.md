@@ -110,6 +110,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | backend_min_count | Minimum ECS task count for autoscaling | `number` | `2` | no |
 | backend_origin_protocol_policy | CloudFront-to-backend origin protocol policy for the primary backend origin. Only HTTPS is supported. | `string` | `"https-only"` | no |
 | backend_origin_request_policy_id | CloudFront origin request policy ID for backend distribution | `string` | `"b689b0a8-53d0-40ab-baf2-68738e2966ac"` | no |
+| backend_path_patterns | Optional ordered CloudFront path patterns routed to the backend origin. Leave empty to use the blueprint defaults. | `list(string)` | `[]` | no |
 | backend_rds_secret_env_var_name | Environment variable name used to inject the RDS managed secret into backend ECS tasks | `string` | `"DB_CREDENTIALS"` | no |
 | backend_readonly_root_filesystem | Run backend container with a read-only root filesystem. | `bool` | `true` | no |
 | backend_scale_in_cooldown_seconds | Scale-in cooldown (seconds) for ECS autoscaling | `number` | `60` | no |
@@ -193,6 +194,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | private_db_subnet_cidrs | CIDR blocks for private database subnets | `list(string)` | `[]` | no |
 | public_app_subnet_cidrs | CIDR blocks for public edge subnets (ALB/NAT gateways) | `list(string)` | `[]` | no |
 | rds_allocated_storage | RDS allocated storage in GB | `number` | `20` | no |
+| rds_auto_minor_version_upgrade | Enable automatic minor version upgrades for the workload RDS instance. | `bool` | `true` | no |
 | rds_backup_retention_period | RDS backup retention period in days | `number` | `14` | no |
 | rds_db_name | Database name | `string` | `"app"` | no |
 | rds_deletion_protection | Enable RDS deletion protection during normal operation. | `bool` | `true` | no |

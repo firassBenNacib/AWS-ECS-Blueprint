@@ -75,7 +75,7 @@ resource "aws_db_instance" "this" {
   performance_insights_enabled        = var.enable_performance_insights
   performance_insights_kms_key_id     = var.enable_performance_insights ? var.performance_insights_kms_key_id : null
   copy_tags_to_snapshot               = true
-  auto_minor_version_upgrade          = true
+  auto_minor_version_upgrade          = var.auto_minor_version_upgrade
   db_subnet_group_name                = aws_db_subnet_group.this.name
 
   vpc_security_group_ids = [var.rds_sg_id]

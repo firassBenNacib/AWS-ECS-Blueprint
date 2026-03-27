@@ -33,10 +33,8 @@ jobs:
 
       - name: Install terraform-docs
         run: |
-          curl -sSfL "https://github.com/terraform-docs/terraform-docs/releases/download/${TERRAFORM_DOCS_VERSION}/terraform-docs-${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz" \
-            -o "${RUNNER_TEMP}/terraform-docs.tar.gz"
-          tar -xzf "${RUNNER_TEMP}/terraform-docs.tar.gz" -C "${RUNNER_TEMP}" terraform-docs
-          install "${RUNNER_TEMP}/terraform-docs" /usr/local/bin/terraform-docs
+          LOCAL_BIN_DIR="${RUNNER_TEMP}/terraform-docs-bin" bash .scripts/install_terraform_docs.sh
+          echo "${RUNNER_TEMP}/terraform-docs-bin" >> "${GITHUB_PATH}"
 
       - name: Verify module documentation
         run: bash .scripts/terraform_docs_gate.sh check
