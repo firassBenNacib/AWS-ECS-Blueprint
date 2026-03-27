@@ -33,6 +33,10 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Uploads only sanitized deployment summaries/result artifacts; the apply job regenerates the approved plan after environment approval.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
   - Applies only after GitHub Environment approval when `apply_after_plan=true`.
+- `drift-detection.yml`
+  - Runs weekly and on demand.
+  - Reuses the normal root backend and tfvars wiring to detect live-state drift without applying changes.
+  - Fails when Terraform returns a detailed-exitcode drift plan and uploads the drift plan artifact for review.
 - `destroy.yml`
   - Runs on `workflow_dispatch` only.
   - Requires a confirmation string matching `destroy <target>` after whitespace normalization before any AWS credentials are used.
@@ -101,6 +105,8 @@ Required repo secrets for the standard plan/apply/destroy workflows:
 Optional repo secrets:
 
 - `INFRACOST_API_KEY` for pull-request cost estimates only
+
+The checked-in [`infracost.yml`](../infracost.yml) is for local `infracost breakdown` usage only. The pull-request workflow intentionally uses speculative plan JSON plus repo-secret tfvars so the PR cost comment matches the actual target inputs more closely.
 
 Live-validation tfvars secrets:
 

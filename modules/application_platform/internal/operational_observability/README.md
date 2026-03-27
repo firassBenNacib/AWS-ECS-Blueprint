@@ -1,13 +1,16 @@
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+|------|---------|
+| terraform | >= 1.8.0, < 2.0.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| aws | n/a |
+| aws | >= 6.0, < 7.0 |
 
 ## Modules
 

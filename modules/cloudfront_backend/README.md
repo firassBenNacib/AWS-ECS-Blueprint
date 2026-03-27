@@ -36,12 +36,12 @@ No modules.
 | backend_alias | Alias for backend CloudFront | `string` | n/a | yes |
 | backend_cert_arn | ACM certificate ARN for backend | `string` | n/a | yes |
 | backend_domain_name | Primary backend origin domain name | `string` | n/a | yes |
-| backend_failover_domain_name | Secondary backend origin domain name used for CloudFront origin failover | `string` | n/a | yes |
 | cache_policy_id | CloudFront cache policy ID | `string` | n/a | yes |
 | origin_request_policy_id | CloudFront origin request policy ID | `string` | n/a | yes |
 | access_logs_prefix | Prefix used for backend CloudFront log objects | `string` | `"cloudfront/backend/"` | no |
 | allowed_methods | HTTP methods accepted by the backend distribution. | `list(string)` | <pre>[<br/>  "GET",<br/>  "HEAD",<br/>  "OPTIONS",<br/>  "PUT",<br/>  "POST",<br/>  "PATCH",<br/>  "DELETE"<br/>]</pre> | no |
 | app_port | Backend ALB listener port used by CloudFront origin | `number` | `8080` | no |
+| backend_failover_domain_name | Secondary backend origin domain name used for CloudFront origin failover. Leave empty when failover is disabled. | `string` | `""` | no |
 | backend_failover_protocol_policy | CloudFront-to-secondary-origin protocol policy. Only HTTPS is supported. | `string` | `"https-only"` | no |
 | backend_vpc_origin_id | Optional CloudFront VPC origin ID for the primary backend origin. | `string` | `null` | no |
 | enable_environment_suffix | Suffix aliases and tags with environment | `bool` | `false` | no |

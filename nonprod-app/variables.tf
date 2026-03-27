@@ -538,7 +538,7 @@ variable "ecs_exec_log_retention_days" {
 }
 
 variable "enable_ecs_exec_audit_alerts" {
-  description = "Enable alerts when ECS Exec is invoked."
+  description = "Enable ECS Exec audit alerts for this root. Alerts are only emitted in production when account-level security controls are enabled."
   type        = bool
   default     = true
 }

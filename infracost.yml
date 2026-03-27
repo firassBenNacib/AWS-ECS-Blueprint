@@ -1,3 +1,5 @@
+# Local Infracost project definitions for manual breakdowns.
+# CI uses speculative Terraform plan JSON plus secret-backed tfvars in pr-plan.yml.
 version: 0.1
 
 projects:

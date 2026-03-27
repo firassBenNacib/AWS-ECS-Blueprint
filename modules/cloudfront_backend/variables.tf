@@ -10,8 +10,9 @@ variable "backend_vpc_origin_id" {
 }
 
 variable "backend_failover_domain_name" {
-  description = "Secondary backend origin domain name used for CloudFront origin failover"
+  description = "Secondary backend origin domain name used for CloudFront origin failover. Leave empty when failover is disabled."
   type        = string
+  default     = ""
 }
 
 variable "backend_alias" {

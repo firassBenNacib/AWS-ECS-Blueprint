@@ -158,14 +158,6 @@ resource "aws_security_group" "microservices_internal" {
     protocol        = "tcp"
     prefix_list_ids = [module.network.s3_gateway_prefix_list_id]
   }
-
-  egress {
-    description = "MySQL to RDS within the VPC"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = [var.security.vpc_cidr]
-  }
 }
 
 resource "aws_security_group" "microservices_extra_egress" {
@@ -212,4 +204,16 @@ resource "aws_security_group" "microservices_rds" {
     protocol    = "-1"
     cidr_blocks = [var.security.vpc_cidr]
   }
+}
+
+resource "aws_security_group_rule" "microservices_internal_to_rds" {
+  count = var.security.runtime_mode_is_micro ? 1 : 0
+
+  type                     = "egress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.microservices_internal[0].id
+  source_security_group_id = aws_security_group.microservices_rds[0].id
+  description              = "MySQL from private ECS services to the RDS security group only."
 }

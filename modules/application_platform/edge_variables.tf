@@ -19,10 +19,9 @@ variable "alb_listener_port" {
 variable "alb_certificate_arn" {
   description = "Regional ACM certificate ARN for the ALB HTTPS listener (can be imported from Let's Encrypt)"
   type        = string
-  default     = null
 
   validation {
-    condition     = var.alb_certificate_arn != null && trimspace(var.alb_certificate_arn) != ""
+    condition     = trimspace(var.alb_certificate_arn) != ""
     error_message = "alb_certificate_arn must be set. HTTPS-only ALB mode requires a regional ACM certificate."
   }
 }
