@@ -93,11 +93,45 @@ jobs:
           tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
           tfvars_env_var="${{ matrix.tfvars_env_var }}"
           tfvars_secret="$(printenv "${tfvars_env_var}" || true)"
+          legacy_adjustments=""
 
           if [[ -n "${tfvars_secret}" ]]; then
             tfvars_source="github-secret"
             tfvars_abs="${RUNNER_TEMP}/${{ matrix.slug }}.tfvars"
             printf '%s\n' "${tfvars_secret}" > "${tfvars_abs}"
+
+            legacy_adjustments="$(
+              python3 - "${tfvars_abs}" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+changes = []
+
+updated = re.sub(
+    r'(?m)^(\s*backend_origin_protocol_policy\s*=\s*)"http-only"(\s*(?:#.*)?)$',
+    r'\1"https-only"\2',
+    text,
+)
+if updated != text:
+    changes.append("normalized backend_origin_protocol_policy=http-only to https-only")
+    text = updated
+
+updated = re.sub(r'(?m)^\s*backend_failover_domain_name\s*=.*(?:\n|$)', "", text)
+if updated != text:
+    changes.append("removed legacy backend_failover_domain_name input")
+    text = updated
+
+path.write_text(text)
+print("; ".join(changes))
+PY
+            )"
+
+            if [[ -n "${legacy_adjustments}" ]]; then
+              echo "::warning::Adjusted legacy tfvars for ${{ matrix.label }}: ${legacy_adjustments}"
+            fi
           fi
 
           {
@@ -106,6 +140,7 @@ jobs:
             echo "label=${{ matrix.label }}"
             echo "tfvars_abs=${tfvars_abs}"
             echo "tfvars_source=${tfvars_source}"
+            echo "legacy_adjustments=${legacy_adjustments}"
             if [[ -f "${{ matrix.backend_config_file }}" ]]; then
               echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
             else
@@ -211,6 +246,9 @@ jobs:
             echo "# Terraform speculative plan for ${{ steps.resolve_inputs.outputs.label }}"
             echo
             echo "tfvars source: ${{ steps.resolve_inputs.outputs.tfvars_source }}"
+            if [[ -n "${{ steps.resolve_inputs.outputs.legacy_adjustments }}" ]]; then
+              echo "legacy adjustments: ${{ steps.resolve_inputs.outputs.legacy_adjustments }}"
+            fi
             echo
           } > "${plan_txt}"
 
