@@ -174,8 +174,9 @@ The curated example profiles are intended to cover:
 - frontend `ecs` delivery mode
 - backend `public_alb_restricted` ingress mode
 
-The checked-in `nonprod-app/terraform.tfvars` uses a practical low-cost non-production profile with `private_app_nat_mode = "canary"` so private services can still reach external SMTP/HTTPS integrations through one NAT gateway.
-The default `nonprod-app/terraform.tfvars.example` remains the ultra-cheap zero-NAT profile. It demonstrates the cheap dev toggle with endpoint-first private networking, single-AZ RDS, managed WAF disabled, per-root AWS Backup disabled, ECS counts clamped to `1/1/1`, and account-level security controls disabled.
+The repository ships `nonprod-app/terraform.tfvars.example` as the public low-cost starting point. Create a real `terraform.tfvars` locally or inject it through CI secrets. The default example remains the ultra-cheap zero-NAT profile. It demonstrates the cheap dev toggle with endpoint-first private networking, single-AZ RDS, managed WAF disabled, per-root AWS Backup disabled, ECS counts clamped to `1/1/1`, and account-level security controls disabled.
+
+If you want a low-cost profile that still keeps private services on a single NAT gateway for external SMTP/HTTPS integrations, prefer `private_app_nat_mode = "canary"` in your local or secret-managed tfvars.
 
 The replaceable `__TOKEN__` placeholders used by the example tfvars files are documented in [`docs/deployment-roots.md`](./docs/deployment-roots.md#replaceable-tokens-in-example-tfvars).
 

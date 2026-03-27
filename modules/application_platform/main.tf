@@ -501,6 +501,7 @@ module "platform_governance" {
     enable_cloudtrail_data_events       = var.enable_cloudtrail_data_events
     cloudtrail_data_event_resources     = var.cloudtrail_data_event_resources
     enable_inspector                    = module.deployment_contract.effective_enable_inspector
+    inspector_resource_types            = var.inspector_resource_types
     enable_ecs_exec_audit_alerts        = module.deployment_contract.ecs_exec_audit_alerting_enabled
     enable_log_bucket_object_lock       = !var.destroy_mode_enabled && var.security_baseline_enable_object_lock
     log_bucket_force_destroy            = module.deployment_contract.effective_s3_force_destroy

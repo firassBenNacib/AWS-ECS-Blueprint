@@ -82,3 +82,5 @@ If a live validation run fails:
 4. rerun manually before changing the normal workload roots
 
 When the failure is only in Terratest but not in `live-validation.yml`, treat it as a signal to inspect the Terratest wrapper or timing assumptions before changing Terraform resources.
+
+The smoke-check helper verifies TLS certificates by default. Only set `LIVE_VALIDATION_INSECURE_TLS=true` when you intentionally need an early bootstrap run to skip certificate verification.

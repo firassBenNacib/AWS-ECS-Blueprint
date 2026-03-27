@@ -55,6 +55,7 @@ module "app" {
   alb_certificate_arn                                        = var.alb_certificate_arn
   backend_cache_policy_id                                    = var.backend_cache_policy_id
   backend_origin_request_policy_id                           = var.backend_origin_request_policy_id
+  vpc_name                                                   = var.vpc_name
   availability_zones                                         = var.availability_zones
   vpc_cidr                                                   = var.vpc_cidr
   public_app_subnet_cidrs                                    = var.public_app_subnet_cidrs
@@ -65,6 +66,7 @@ module "app" {
   backend_origin_protocol_policy                             = var.backend_origin_protocol_policy
   enable_origin_auth_header                                  = var.enable_origin_auth_header
   origin_auth_header_ssm_parameter_name                      = var.origin_auth_header_ssm_parameter_name
+  origin_auth_previous_header_ssm_parameter_name             = var.origin_auth_previous_header_ssm_parameter_name
   cloudfront_logs_bucket_name                                = var.cloudfront_logs_bucket_name
   rds_instance_class                                         = var.rds_instance_class
   rds_engine_version                                         = var.rds_engine_version
@@ -73,15 +75,22 @@ module "app" {
   rds_enable_performance_insights                            = var.rds_enable_performance_insights
   enable_rds_master_user_password_rotation                   = var.enable_rds_master_user_password_rotation
   rds_master_user_password_rotation_automatically_after_days = var.rds_master_user_password_rotation_automatically_after_days
+  rds_backup_retention_period                                = var.rds_backup_retention_period
+  enable_rds_iam_auth                                        = var.enable_rds_iam_auth
   rds_deletion_protection                                    = var.rds_deletion_protection
   rds_skip_final_snapshot_on_destroy                         = var.rds_skip_final_snapshot_on_destroy
   rds_username                                               = var.rds_username
   enable_managed_waf                                         = var.enable_managed_waf
+  backend_web_acl_arn                                        = var.backend_web_acl_arn
   enable_aws_backup                                          = var.enable_aws_backup
   enable_budget_alerts                                       = var.enable_budget_alerts
   enable_operational_alarms                                  = var.enable_operational_alarms
   enable_security_baseline                                   = var.enable_security_baseline
+  enable_inspector                                           = var.enable_inspector
+  inspector_resource_types                                   = var.inspector_resource_types
   enable_account_security_controls                           = var.enable_account_security_controls
+  security_findings_sns_topic_arn                            = var.security_findings_sns_topic_arn
+  security_findings_sns_subscriptions                        = var.security_findings_sns_subscriptions
   budget_alert_email_addresses                               = var.budget_alert_email_addresses
   budget_alert_topic_arns                                    = var.budget_alert_topic_arns
   budget_alert_threshold_percentages                         = var.budget_alert_threshold_percentages
@@ -96,6 +105,8 @@ module "app" {
   operational_alarm_cloudfront_5xx_rate_threshold            = var.operational_alarm_cloudfront_5xx_rate_threshold
   security_baseline_enable_object_lock                       = var.security_baseline_enable_object_lock
   enable_aws_config                                          = var.enable_aws_config
+  enable_cloudtrail_data_events                              = var.enable_cloudtrail_data_events
+  cloudtrail_data_event_resources                            = var.cloudtrail_data_event_resources
   ecs_exec_log_retention_days                                = var.ecs_exec_log_retention_days
   enable_ecs_exec_audit_alerts                               = var.enable_ecs_exec_audit_alerts
   destroy_mode_enabled                                       = var.destroy_mode_enabled

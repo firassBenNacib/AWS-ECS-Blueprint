@@ -118,6 +118,12 @@ variable "enable_inspector" {
   default     = true
 }
 
+variable "inspector_resource_types" {
+  description = "Amazon Inspector resource types to enable for account-level vulnerability scanning."
+  type        = list(string)
+  default     = ["ECR", "EC2"]
+}
+
 variable "enable_aws_backup" {
   description = "Enable AWS Backup plan/selection for the primary RDS instance."
   type        = bool

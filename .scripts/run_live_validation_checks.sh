@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+LIVE_VALIDATION_INSECURE_TLS="${LIVE_VALIDATION_INSECURE_TLS:-false}"
+
 usage() {
   echo "Usage: $0 --path PATH --state-file FILE --aws-region REGION --smoke-profile PROFILE" >&2
   exit 1
@@ -163,7 +165,11 @@ check_http_endpoint() {
   fi
 
   local status
-  status="$(curl -ksS -o /dev/null -w '%{http_code}' --max-time 30 "${url}")"
+  local -a curl_args=(-sS -o /dev/null -w '%{http_code}' --max-time 30)
+  if [[ "${LIVE_VALIDATION_INSECURE_TLS}" == "true" ]]; then
+    curl_args=(-k "${curl_args[@]}")
+  fi
+  status="$(curl "${curl_args[@]}" "${url}")"
   case "${status}" in
     2*|3*|401|403|404)
       echo "HTTP check passed for ${name}: ${url} -> ${status}"

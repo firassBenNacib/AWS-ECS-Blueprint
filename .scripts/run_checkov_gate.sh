@@ -77,8 +77,8 @@ def normalize_resource(resource: str) -> str:
     return re.sub(r"\[\d+\]", "", resource)
 
 
-def resource_aliases(resource: str) -> set[tuple[str, str]]:
-    aliases = set()
+def resource_aliases(resource: str) -> set[str]:
+    aliases: set[str] = set()
     current = resource
     while True:
         aliases.add(current)

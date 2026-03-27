@@ -26,6 +26,7 @@ module "security_baseline" {
   enable_cloudtrail_data_events       = var.security.enable_cloudtrail_data_events
   cloudtrail_data_event_resources     = var.security.cloudtrail_data_event_resources
   enable_inspector                    = var.security.enable_inspector
+  inspector_resource_types            = var.security.inspector_resource_types
   enable_ecs_exec_audit_alerts        = var.security.enable_ecs_exec_audit_alerts
   enable_log_bucket_object_lock       = var.security.enable_log_bucket_object_lock
   log_bucket_force_destroy            = var.security.log_bucket_force_destroy

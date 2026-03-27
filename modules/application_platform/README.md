@@ -174,6 +174,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | frontend_runtime_mode | Frontend runtime topology. s3 keeps the current S3+CloudFront static model; ecs targets the internal ALB/ECS frontend origin. | `string` | `"s3"` | no |
 | frontend_viewer_protocol_policy | Viewer protocol policy for frontend CloudFront distribution | `string` | `"https-only"` | no |
 | frontend_web_acl_arn | Optional WAFv2 Web ACL ARN for frontend CloudFront distribution | `string` | `null` | no |
+| inspector_resource_types | Amazon Inspector resource types to enable for account-level vulnerability scanning. | `list(string)` | <pre>[<br/>  "ECR",<br/>  "EC2"<br/>]</pre> | no |
 | interface_endpoint_services | AWS service short names used to create Interface VPC Endpoints for private Fargate runtime dependencies. | `list(string)` | <pre>[<br/>  "ecr.api",<br/>  "ecr.dkr",<br/>  "logs",<br/>  "sts",<br/>  "secretsmanager",<br/>  "kms"<br/>]</pre> | no |
 | live_validation_dns_label | Stable DNS label used for live-validation public aliases (for example: lv-prod). Required when live_validation_mode=true. | `string` | `null` | no |
 | live_validation_mode | When true, the deployment is being created only for isolated live-validation runs and must use an lv-* environment name. | `bool` | `false` | no |
