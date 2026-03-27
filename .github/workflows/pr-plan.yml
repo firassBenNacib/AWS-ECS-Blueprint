@@ -252,15 +252,27 @@ jobs:
               exit_code=$?
               set -e
 
+              counts="$(python3 .scripts/extract_terraform_plan_counts.py "${plan_txt}")"
+              read -r parsed_add parsed_change parsed_destroy <<< "${counts}"
+
               if [[ "${exit_code}" -eq 0 ]]; then
-                status="no_changes"
-                add=0
-                change=0
-                destroy=0
+                if (( parsed_add > 0 || parsed_change > 0 || parsed_destroy > 0 )); then
+                  status="changes"
+                  add="${parsed_add}"
+                  change="${parsed_change}"
+                  destroy="${parsed_destroy}"
+                  echo "::warning::terraform plan returned exit code 0 for ${{ steps.resolve_inputs.outputs.label }}, but the plan text contains changes. Falling back to parsed plan counts." >> "${plan_txt}"
+                else
+                  status="no_changes"
+                  add=0
+                  change=0
+                  destroy=0
+                fi
               elif [[ "${exit_code}" -eq 2 ]]; then
                 status="changes"
-                counts="$(python3 .scripts/extract_terraform_plan_counts.py "${plan_txt}")"
-                read -r add change destroy <<< "${counts}"
+                add="${parsed_add}"
+                change="${parsed_change}"
+                destroy="${parsed_destroy}"
               fi
 
               if [[ "${status}" == "changes" || "${status}" == "no_changes" ]]; then
