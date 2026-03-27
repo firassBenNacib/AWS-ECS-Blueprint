@@ -69,24 +69,24 @@ variable "app_port" {
 }
 
 variable "origin_protocol_policy" {
-  description = "CloudFront-to-origin protocol policy"
+  description = "CloudFront-to-origin protocol policy. Only HTTPS is supported."
   type        = string
   default     = "https-only"
 
   validation {
-    condition     = contains(["http-only", "https-only"], var.origin_protocol_policy)
-    error_message = "origin_protocol_policy must be either 'http-only' or 'https-only'."
+    condition     = var.origin_protocol_policy == "https-only"
+    error_message = "origin_protocol_policy must be https-only."
   }
 }
 
 variable "backend_failover_protocol_policy" {
-  description = "CloudFront-to-secondary-origin protocol policy"
+  description = "CloudFront-to-secondary-origin protocol policy. Only HTTPS is supported."
   type        = string
   default     = "https-only"
 
   validation {
-    condition     = contains(["http-only", "https-only"], var.backend_failover_protocol_policy)
-    error_message = "backend_failover_protocol_policy must be either 'http-only' or 'https-only'."
+    condition     = var.backend_failover_protocol_policy == "https-only"
+    error_message = "backend_failover_protocol_policy must be https-only."
   }
 }
 

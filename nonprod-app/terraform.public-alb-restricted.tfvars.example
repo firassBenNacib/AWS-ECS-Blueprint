@@ -1,0 +1,45 @@
+# Public restricted ALB example for non-production environments.
+# Start from this profile when CloudFront VPC origins do not fit the workload and the backend ALB must be public but restricted to CloudFront origin-facing infrastructure.
+
+project_name                        = "example-app"
+frontend_geo_restriction_type       = "none"
+frontend_geo_locations              = []
+
+aws_region                          = "eu-west-1"
+dr_region                           = "us-west-2"
+nonprod_app_role_arn                = null
+environment_domain                  = "example.com"
+route53_zone_id                     = null
+route53_zone_strategy               = "create"
+bucket_name                         = "example-app-frontend-nonprod"
+availability_zones                  = ["eu-west-1a", "eu-west-1b"]
+vpc_cidr                            = "10.40.0.0/16"
+public_app_subnet_cidrs             = ["10.40.1.0/24", "10.40.2.0/24"]
+private_app_subnet_cidrs            = ["10.40.21.0/24", "10.40.22.0/24"]
+private_db_subnet_cidrs             = ["10.40.11.0/24", "10.40.12.0/24"]
+private_app_nat_mode                = "required"
+enable_cost_optimized_dev_tier      = false
+backend_ingress_mode                = "public_alb_restricted"
+backend_container_image             = "555555555555.dkr.ecr.eu-west-1.amazonaws.com/example-app-backend-nonprod@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+backend_origin_protocol_policy      = "https-only"
+acm_cert_frontend                   = "arn:aws:acm:us-east-1:555555555555:certificate/22222222-2222-2222-2222-222222222222"
+alb_certificate_arn                 = "arn:aws:acm:eu-west-1:555555555555:certificate/33333333-3333-3333-3333-333333333333"
+backend_cache_policy_id             = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+backend_origin_request_policy_id    = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+origin_auth_header_ssm_parameter_name = "/example-app/nonprod/origin-auth/current"
+cloudfront_logs_bucket_name         = "example-app-cf-logs-nonprod"
+rds_instance_class                  = "db.t4g.micro"
+rds_multi_az                        = false
+enable_rds_master_user_password_rotation = true
+rds_master_user_password_rotation_automatically_after_days = 30
+rds_enable_performance_insights     = false
+rds_username                        = "appadmin"
+enable_security_baseline            = false
+enable_account_security_controls    = false
+enable_aws_config                   = false
+enable_ecs_exec_audit_alerts        = false
+
+org_id                 = "o-xxxxxxxxxx"
+security_account_id    = "111111111111"
+log_archive_account_id = "222222222222"
+prod_account_id        = "444444444444"

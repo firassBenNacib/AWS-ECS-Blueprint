@@ -1,5 +1,5 @@
 # Single-account gateway/microservices mode for a reusable multi-service application template.
-# The ecs_services map below is illustrative only. Replace service names, ports, env, and secrets with your own application contract.
+# The ecs_services map below is illustrative only. Replace service names, ports, env, and secrets with values that match your application.
 # Replace the digest placeholders and app secret ARNs before apply. The RDS endpoint/password and SMTP host resolve inside Terraform.
 
 project_name                         = "example-app"
@@ -8,8 +8,7 @@ dr_region                             = "us-west-2"
 prod_app_role_arn                     = null
 environment_domain                      = "microservices.example.com"
 route53_zone_id                       = null
-backend_geo_restriction_type          = "none"
-backend_geo_locations                 = []
+route53_zone_strategy                 = "create"
 frontend_geo_restriction_type         = "none"
 frontend_geo_locations                = []
 destroy_mode_enabled                  = false
@@ -23,6 +22,8 @@ public_app_subnet_cidrs               = ["10.30.1.0/24", "10.30.2.0/24"]
 private_app_subnet_cidrs              = ["10.30.21.0/24", "10.30.22.0/24"]
 private_db_subnet_cidrs               = ["10.30.11.0/24", "10.30.12.0/24"]
 private_app_nat_mode                  = "required"
+enable_cost_optimized_dev_tier        = false
+backend_ingress_mode                  = "vpc_origin_alb"
 backend_container_image               = null
 app_runtime_mode                      = "gateway_microservices"
 backend_origin_protocol_policy        = "https-only"
@@ -34,11 +35,15 @@ backend_origin_request_policy_id      = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 origin_auth_header_ssm_parameter_name = "/example-app/prod/origin-auth/current"
 cloudfront_logs_bucket_name           = "example-app-cf-logs-prod"
 rds_instance_class                    = "db.t4g.small"
+rds_multi_az                          = true
+enable_rds_master_user_password_rotation = true
+rds_master_user_password_rotation_automatically_after_days = 30
 rds_enable_performance_insights       = false
 rds_username                          = "devops_app"
 enable_security_baseline              = true
 enable_account_security_controls      = true
 enable_aws_config                     = true
+enable_ecs_exec_audit_alerts          = true
 
 org_id                 = null
 security_account_id    = null
@@ -185,6 +190,7 @@ ecs_services = {
     desired_count     = 2
     min_count         = 2
     max_count         = 4
+    readonly_root_fs  = true
     health_check_path = "/health"
     env = {
       PORT                       = "8090"

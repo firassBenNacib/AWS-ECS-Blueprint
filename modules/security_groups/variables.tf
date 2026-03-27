@@ -15,22 +15,6 @@ variable "alb_listener_port" {
   default     = 443
 }
 
-variable "http_origin_listener_port" {
-  description = "Optional internal HTTP listener port used by CloudFront VPC-origin traffic."
-  type        = number
-  default     = null
-}
-
-variable "alb_ingress_cidr_blocks" {
-  description = "CIDR blocks allowed to reach the internal ALB listener."
-  type        = list(string)
-
-  validation {
-    condition     = length(var.alb_ingress_cidr_blocks) > 0
-    error_message = "alb_ingress_cidr_blocks must include at least one CIDR."
-  }
-}
-
 variable "egress_endpoint_sg_id" {
   description = "Security group ID attached to Interface VPC Endpoints for private AWS API egress."
   type        = string

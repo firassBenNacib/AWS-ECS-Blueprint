@@ -11,7 +11,7 @@ Reusable Terraform module for account-level security controls:
 - findings routing to SNS/EventBridge
 - audit-log buckets, replication, and related KMS/logging controls
 
-This module no longer owns AWS Backup resources. Per-root backup vaults, plans, and selections now live in [`modules/backup_baseline`](../backup_baseline/README.md).
+AWS Backup resources are no longer owned by this module. Per-root backup vaults, plans, and selections now live in [`modules/backup_baseline`](../backup_baseline/README.md).
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -38,8 +38,10 @@ No modules.
 |------|------|
 | [aws_accessanalyzer_analyzer.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/accessanalyzer_analyzer) | resource |
 | [aws_cloudtrail.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudtrail) | resource |
+| [aws_cloudwatch_event_rule.ecs_exec_invocations](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
 | [aws_cloudwatch_event_rule.guardduty_high_critical](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
 | [aws_cloudwatch_event_rule.securityhub_high_critical](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
+| [aws_cloudwatch_event_target.ecs_exec_invocations_sns](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
 | [aws_cloudwatch_event_target.guardduty_high_critical_sns](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
 | [aws_cloudwatch_event_target.securityhub_high_critical_sns](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
 | [aws_cloudwatch_log_group.cloudtrail](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
@@ -98,6 +100,7 @@ No modules.
 | enable_access_analyzer | Enable IAM Access Analyzer | `bool` | `true` | no |
 | enable_aws_config | Enable AWS Config recorder and delivery channel. | `bool` | `true` | no |
 | enable_cloudtrail_data_events | Enable CloudTrail data event selectors for high-value resources. | `bool` | `false` | no |
+| enable_ecs_exec_audit_alerts | Enable EventBridge alerts for ECS Exec shell access observed via CloudTrail. | `bool` | `false` | no |
 | enable_inspector | Enable Amazon Inspector account scanning. | `bool` | `true` | no |
 | enable_log_bucket_object_lock | Enable S3 Object Lock on the primary security baseline log bucket. | `bool` | `false` | no |
 | enable_security_hub | Enable Security Hub account integration and standards subscriptions | `bool` | `true` | no |
@@ -116,6 +119,7 @@ No modules.
 | cloudtrail_arn | ARN of the multi-region CloudTrail |
 | cloudtrail_name | Name of the CloudTrail trail |
 | config_recorder_name | AWS Config recorder name |
+| ecs_exec_audit_event_rule_name | EventBridge rule name forwarding ECS Exec invocations to security notifications. |
 | inspector_enabled_resource_types | Amazon Inspector enabled resource types. |
 | log_bucket_dr_name | DR-region replica bucket used for security baseline logs. |
 | log_bucket_name | S3 bucket used for security baseline logs |

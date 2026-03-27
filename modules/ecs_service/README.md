@@ -74,7 +74,7 @@ No modules.
 | environment | Plaintext environment variables passed to the container. | `map(string)` | `{}` | no |
 | exec_kms_key_arn | KMS key ARN used to encrypt ECS Exec sessions. | `string` | `null` | no |
 | exec_log_group_name | CloudWatch log group name used for ECS Exec audit logs. | `string` | `null` | no |
-| exec_log_retention_days | CloudWatch log retention in days for ECS Exec logs. | `number` | `30` | no |
+| exec_log_retention_days | CloudWatch log retention in days for ECS Exec logs. | `number` | `365` | no |
 | health_check_command | Optional container health check command in ECS format, for example ["CMD-SHELL", "wget ... \|\| exit 1"]. | `list(string)` | `[]` | no |
 | health_check_grace_period_seconds | ECS service health-check grace period in seconds. | `number` | `60` | no |
 | health_check_interval_seconds | Container health check interval in seconds. | `number` | `30` | no |

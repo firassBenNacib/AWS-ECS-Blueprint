@@ -47,8 +47,14 @@ output "security_findings_event_rule_names" {
   description = "EventBridge rule names forwarding high-severity security findings."
   value = compact([
     aws_cloudwatch_event_rule.guardduty_high_critical.name,
-    try(aws_cloudwatch_event_rule.securityhub_high_critical[0].name, null)
+    try(aws_cloudwatch_event_rule.securityhub_high_critical[0].name, null),
+    try(aws_cloudwatch_event_rule.ecs_exec_invocations[0].name, null)
   ])
+}
+
+output "ecs_exec_audit_event_rule_name" {
+  description = "EventBridge rule name forwarding ECS Exec invocations to security notifications."
+  value       = try(aws_cloudwatch_event_rule.ecs_exec_invocations[0].name, null)
 }
 
 output "inspector_enabled_resource_types" {

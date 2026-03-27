@@ -27,12 +27,9 @@ No modules.
 | Name | Type |
 |------|------|
 | [aws_lb.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb) | resource |
-| [aws_lb_listener.http_origin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener) | resource |
 | [aws_lb_listener.https](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener) | resource |
 | [aws_lb_listener_rule.origin_auth_primary](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener_rule) | resource |
-| [aws_lb_listener_rule.origin_auth_primary_http](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener_rule) | resource |
 | [aws_lb_listener_rule.origin_auth_secondary](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener_rule) | resource |
-| [aws_lb_listener_rule.origin_auth_secondary_http](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener_rule) | resource |
 | [aws_lb_target_group.backend](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_target_group) | resource |
 
 ## Inputs
@@ -51,7 +48,6 @@ No modules.
 | enable_deletion_protection | Enable ALB deletion protection | `bool` | `false` | no |
 | enable_environment_suffix | Suffix ALB resources with environment | `bool` | `false` | no |
 | enable_origin_auth_header | Enable CloudFront origin custom-header enforcement at ALB listener level | `bool` | `true` | no |
-| enable_origin_http_listener | Create an internal HTTP listener dedicated to CloudFront VPC-origin traffic. | `bool` | `false` | no |
 | environment_name_override | Optional explicit environment name used for ALB resource naming. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
 | health_check_healthy_threshold | ALB target group healthy threshold count | `number` | `2` | no |
 | health_check_interval_seconds | ALB target group health check interval | `number` | `30` | no |
@@ -60,11 +56,11 @@ No modules.
 | health_check_timeout_seconds | ALB target group health check timeout | `number` | `5` | no |
 | health_check_unhealthy_threshold | ALB target group unhealthy threshold count | `number` | `3` | no |
 | idle_timeout | ALB idle timeout in seconds | `number` | `60` | no |
+| internal | Whether the ALB is internal-only. | `bool` | `true` | no |
 | origin_auth_header_name | Primary origin auth header name accepted by ALB listener rules | `string` | `"X-Origin-Verify"` | no |
 | origin_auth_header_value | Primary origin auth header value accepted by ALB listener rules | `string` | `""` | no |
 | origin_auth_previous_header_name | Secondary origin auth header name accepted during header rotation | `string` | `"X-Origin-Verify-Prev"` | no |
 | origin_auth_previous_header_value | Secondary origin auth header value accepted during header rotation | `string` | `""` | no |
-| origin_http_listener_port | Port used by the optional internal HTTP listener for CloudFront VPC-origin traffic. | `number` | `80` | no |
 | ssl_policy | SSL policy for ALB HTTPS listener | `string` | `"ELBSecurityPolicy-TLS13-1-2-2021-06"` | no |
 | target_group_name | Target group name base | `string` | `"app-backend-tg"` | no |
 | target_type | Target type for ALB target group. ECS Fargate requires ip. | `string` | `"ip"` | no |

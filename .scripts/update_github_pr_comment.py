@@ -9,12 +9,15 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 
 API_BASE = "https://api.github.com"
+JsonObject = dict[str, Any]
+JsonList = list[JsonObject]
 
 
-def api_request(method: str, url: str, token: str, payload: dict | None = None) -> dict | list:
+def api_request(method: str, url: str, token: str, payload: dict[str, Any] | None = None) -> JsonObject | JsonList:
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",
@@ -53,7 +56,10 @@ def main() -> int:
 
     body = Path(args.body_file).read_text()
     comments_url = f"{API_BASE}/repos/{args.repo}/issues/{args.pr_number}/comments?per_page=100"
-    comments = api_request("GET", comments_url, token)
+    comments_response = api_request("GET", comments_url, token)
+    if not isinstance(comments_response, list):
+        raise RuntimeError(f"Expected a list response from GitHub comments API, got {type(comments_response).__name__}")
+    comments = comments_response
 
     existing_comment = None
     for comment in comments:
@@ -70,12 +76,15 @@ def main() -> int:
         )
         print(f"Updated PR comment {existing_comment['id']}")
     else:
-        created = api_request(
+        created_response = api_request(
             "POST",
             f"{API_BASE}/repos/{args.repo}/issues/{args.pr_number}/comments",
             token,
             {"body": body},
         )
+        if not isinstance(created_response, dict):
+            raise RuntimeError(f"Expected an object response when creating a PR comment, got {type(created_response).__name__}")
+        created = created_response
         print(f"Created PR comment {created['id']}")
 
     return 0

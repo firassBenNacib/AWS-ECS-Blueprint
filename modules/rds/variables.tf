@@ -44,6 +44,18 @@ variable "instance_class" {
   default     = "db.t4g.micro"
 }
 
+variable "engine_version" {
+  description = "RDS engine version for the MySQL instance."
+  type        = string
+  default     = "8.4.8"
+}
+
+variable "multi_az" {
+  description = "Enable Multi-AZ deployment for the RDS instance."
+  type        = bool
+  default     = true
+}
+
 variable "allocated_storage" {
   description = "Allocated storage in GB"
   type        = number
@@ -85,6 +97,7 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+
 
 variable "skip_final_snapshot" {
   description = "Skip the final snapshot on instance deletion."
@@ -147,5 +160,5 @@ variable "monitoring_interval_seconds" {
 variable "enabled_cloudwatch_logs_exports" {
   description = "RDS log types exported to CloudWatch Logs"
   type        = list(string)
-  default     = ["error", "general", "slowquery"]
+  default     = ["audit", "error", "general", "slowquery"]
 }

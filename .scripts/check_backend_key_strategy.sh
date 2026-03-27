@@ -17,7 +17,6 @@ for file in "${BACKEND_FILES[@]}"; do
   if [[ "${file}" == *.example ]]; then
     real_file="${file%.example}"
     if [[ -f "${real_file}" ]]; then
-      # Prefer concrete local backend files over templates when both exist.
       continue
     fi
   fi

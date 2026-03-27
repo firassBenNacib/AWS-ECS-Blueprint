@@ -50,6 +50,17 @@ variable "route53_zone_id" {
   default     = null
 }
 
+variable "route53_zone_strategy" {
+  description = "How to resolve the public Route53 hosted zone when route53_zone_id is not set."
+  type        = string
+  default     = "explicit"
+
+  validation {
+    condition     = contains(["explicit", "autodiscover", "create"], var.route53_zone_strategy)
+    error_message = "route53_zone_strategy must be one of explicit, autodiscover, or create."
+  }
+}
+
 variable "bucket_name" {
   description = "Primary frontend S3 bucket base name."
   type        = string
@@ -64,6 +75,29 @@ variable "app_runtime_mode" {
     condition     = contains(["single_backend", "gateway_microservices"], var.app_runtime_mode)
     error_message = "app_runtime_mode must be either single_backend or gateway_microservices."
   }
+}
+
+variable "backend_ingress_mode" {
+  description = "Backend ingress architecture: vpc_origin_alb for private CloudFront VPC origins or public_alb_restricted for CloudFront-restricted public ALBs."
+  type        = string
+  default     = "vpc_origin_alb"
+
+  validation {
+    condition     = contains(["vpc_origin_alb", "public_alb_restricted"], var.backend_ingress_mode)
+    error_message = "backend_ingress_mode must be either vpc_origin_alb or public_alb_restricted."
+  }
+}
+
+variable "live_validation_mode" {
+  description = "Enable isolated live-validation behavior for this root."
+  type        = bool
+  default     = false
+}
+
+variable "live_validation_dns_label" {
+  description = "Stable DNS label used by live validation for public aliases."
+  type        = string
+  default     = null
 }
 
 variable "frontend_runtime_mode" {
@@ -81,6 +115,12 @@ variable "backend_container_image" {
   description = "Digest-pinned backend container image URI."
   type        = string
   default     = null
+}
+
+variable "allowed_image_registries" {
+  description = "Optional list of approved image repository prefixes. Leave empty to enforce the managed ECR repository prefix."
+  type        = list(string)
+  default     = []
 }
 
 variable "service_discovery_namespace_name" {
@@ -142,31 +182,6 @@ variable "ecs_services" {
   default = {}
 }
 
-variable "backend_geo_restriction_type" {
-  description = "Backend CloudFront geo restriction mode: none, whitelist, or blacklist."
-  type        = string
-  default     = "none"
-
-  validation {
-    condition     = contains(["none", "whitelist", "blacklist"], var.backend_geo_restriction_type)
-    error_message = "backend_geo_restriction_type must be one of none, whitelist, or blacklist."
-  }
-}
-
-variable "backend_geo_locations" {
-  description = "ISO 3166-1 alpha-2 country codes used when backend_geo_restriction_type is whitelist or blacklist."
-  type        = list(string)
-  default     = []
-
-  validation {
-    condition = (
-      var.backend_geo_restriction_type == "none" ||
-      length(var.backend_geo_locations) > 0
-    )
-    error_message = "backend_geo_locations must contain at least one country code when backend_geo_restriction_type is whitelist or blacklist."
-  }
-}
-
 variable "frontend_geo_restriction_type" {
   description = "Frontend CloudFront geo restriction mode: none, whitelist, or blacklist."
   type        = string
@@ -218,10 +233,40 @@ variable "rds_instance_class" {
   default     = "db.t4g.micro"
 }
 
+variable "rds_engine_version" {
+  description = "RDS engine version for the non-production database."
+  type        = string
+  default     = "8.4.8"
+}
+
+variable "backend_task_cpu_architecture" {
+  description = "Fargate CPU architecture for the default backend task definition."
+  type        = string
+  default     = "ARM64"
+}
+
 variable "rds_enable_performance_insights" {
   description = "Enable RDS Performance Insights in non-production when the selected instance class supports it."
   type        = bool
   default     = false
+}
+
+variable "rds_multi_az" {
+  description = "Enable Multi-AZ deployment for the non-production RDS instance."
+  type        = bool
+  default     = false
+}
+
+variable "enable_rds_master_user_password_rotation" {
+  description = "Enable automatic rotation for the non-production RDS master user secret."
+  type        = bool
+  default     = true
+}
+
+variable "rds_master_user_password_rotation_automatically_after_days" {
+  description = "Rotation interval in days for the non-production RDS master user secret."
+  type        = number
+  default     = 30
 }
 
 variable "availability_zones" {
@@ -265,6 +310,12 @@ variable "private_app_nat_mode" {
   }
 }
 
+variable "enable_cost_optimized_dev_tier" {
+  description = "Enable the low-cost dev-tier profile in this root."
+  type        = bool
+  default     = false
+}
+
 variable "alb_certificate_arn" {
   description = "Regional ACM certificate ARN for internal ALB HTTPS listener."
   type        = string
@@ -275,19 +326,25 @@ variable "origin_auth_header_ssm_parameter_name" {
   type        = string
 }
 
+variable "enable_origin_auth_header" {
+  description = "Enable CloudFront origin custom-header authentication for the backend origin."
+  type        = bool
+  default     = true
+}
+
 variable "cloudfront_logs_bucket_name" {
   description = "CloudFront access logs bucket name."
   type        = string
 }
 
 variable "backend_origin_protocol_policy" {
-  description = "CloudFront VPC-origin protocol policy for the primary backend origin."
+  description = "CloudFront-to-backend origin protocol policy for the primary backend origin. Only HTTPS is supported."
   type        = string
   default     = "https-only"
 
   validation {
-    condition     = contains(["http-only", "https-only"], var.backend_origin_protocol_policy)
-    error_message = "backend_origin_protocol_policy must be one of http-only or https-only."
+    condition     = var.backend_origin_protocol_policy == "https-only"
+    error_message = "backend_origin_protocol_policy must be https-only."
   }
 }
 
@@ -295,6 +352,102 @@ variable "enable_security_baseline" {
   description = "Enable account-level baseline controls in the workload account."
   type        = bool
   default     = true
+}
+
+variable "enable_managed_waf" {
+  description = "Enable managed WAF protection for the non-production root."
+  type        = bool
+  default     = true
+}
+
+variable "enable_aws_backup" {
+  description = "Enable per-root AWS Backup resources for the non-production root."
+  type        = bool
+  default     = true
+}
+
+variable "enable_budget_alerts" {
+  description = "Enable optional AWS Budgets alerts for the non-production root."
+  type        = bool
+  default     = false
+}
+
+variable "budget_alert_email_addresses" {
+  description = "Email addresses subscribed to AWS Budgets alerts."
+  type        = list(string)
+  default     = []
+}
+
+variable "budget_alert_topic_arns" {
+  description = "SNS topic ARNs subscribed to AWS Budgets alerts."
+  type        = list(string)
+  default     = []
+}
+
+variable "budget_alert_threshold_percentages" {
+  description = "Percentage thresholds that trigger ACTUAL spend AWS Budgets notifications."
+  type        = list(number)
+  default     = [80, 100]
+}
+
+variable "budget_total_monthly_limit" {
+  description = "Optional total monthly budget limit for the non-production root."
+  type        = number
+  default     = null
+}
+
+variable "budget_cloudfront_monthly_limit" {
+  description = "Optional monthly budget limit for Amazon CloudFront."
+  type        = number
+  default     = null
+}
+
+variable "budget_vpc_monthly_limit" {
+  description = "Optional monthly budget limit for Amazon Virtual Private Cloud charges, including NAT-related spend."
+  type        = number
+  default     = null
+}
+
+variable "budget_rds_monthly_limit" {
+  description = "Optional monthly budget limit for Amazon Relational Database Service."
+  type        = number
+  default     = null
+}
+
+variable "enable_operational_alarms" {
+  description = "Enable workload operational alarms for the non-production root."
+  type        = bool
+  default     = false
+}
+
+variable "operational_alarm_topic_arn" {
+  description = "Optional SNS topic ARN receiving workload operational alarms."
+  type        = string
+  default     = null
+}
+
+variable "operational_alarm_alb_target_5xx_threshold" {
+  description = "Threshold for backend ALB target 5xx count operational alarms."
+  type        = number
+  default     = 10
+}
+
+variable "operational_alarm_ecs_running_task_min_threshold" {
+  description = "Minimum running task count threshold before the ECS operational alarm fires."
+  type        = number
+  default     = 1
+}
+
+variable "operational_alarm_rds_cpu_threshold" {
+  description = "Average RDS CPU utilization threshold for the non-production operational alarm."
+  type        = number
+  default     = 80
+}
+
+variable "operational_alarm_cloudfront_5xx_rate_threshold" {
+  description = "CloudFront 5xx error rate threshold for the non-production operational alarm."
+  type        = number
+  default     = 5
 }
 
 variable "enable_account_security_controls" {
@@ -305,6 +458,18 @@ variable "enable_account_security_controls" {
 
 variable "enable_aws_config" {
   description = "Enable AWS Config recorder and delivery channel in the workload account baseline."
+  type        = bool
+  default     = true
+}
+
+variable "ecs_exec_log_retention_days" {
+  description = "CloudWatch log retention days for ECS Exec audit logs."
+  type        = number
+  default     = 365
+}
+
+variable "enable_ecs_exec_audit_alerts" {
+  description = "Enable alerts when ECS Exec is invoked."
   type        = bool
   default     = true
 }
@@ -327,6 +492,7 @@ variable "rds_deletion_protection" {
   default     = true
 }
 
+
 variable "rds_skip_final_snapshot_on_destroy" {
   description = "Skip the final RDS snapshot during destroy."
   type        = bool
@@ -334,7 +500,7 @@ variable "rds_skip_final_snapshot_on_destroy" {
 }
 
 variable "org_id" {
-  description = "Organizations ID for cross-deployment contract metadata."
+  description = "AWS Organizations ID used for shared deployment metadata."
   type        = string
   default     = null
 }
@@ -352,13 +518,7 @@ variable "log_archive_account_id" {
 }
 
 variable "prod_account_id" {
-  description = "Production account ID (contract variable)."
-  type        = string
-  default     = null
-}
-
-variable "backend_failover_domain_name" {
-  description = "Optional DR backend origin domain for CloudFront failover. Set to a real DR ALB/API domain when you have one; leave null to use the primary ALB (no real failover)."
+  description = "Production account ID used for cross-account references."
   type        = string
   default     = null
 }

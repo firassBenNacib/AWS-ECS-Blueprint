@@ -36,7 +36,6 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| alb_ingress_cidr_blocks | CIDR blocks allowed to reach the internal ALB listener. | `list(string)` | n/a | yes |
 | vpc_id | The ID of the VPC where security groups are created | `string` | n/a | yes |
 | alb_listener_port | ALB listener port exposed through CloudFront VPC-origin path | `number` | `443` | no |
 | app_port | Backend application port | `number` | `8080` | no |
@@ -44,7 +43,6 @@ No modules.
 | egress_s3_prefix_list_id | Managed prefix list ID for Amazon S3 gateway-endpoint egress. | `string` | `null` | no |
 | enable_environment_suffix | Suffix security group names with environment | `bool` | `false` | no |
 | environment_name_override | Optional explicit environment name used for security-group naming. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
-| http_origin_listener_port | Optional internal HTTP listener port used by CloudFront VPC-origin traffic. | `number` | `null` | no |
 
 ## Outputs
 

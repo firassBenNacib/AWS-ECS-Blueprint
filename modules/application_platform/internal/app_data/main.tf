@@ -1,0 +1,31 @@
+module "rds" {
+  source = "../../../rds"
+
+  identifier                      = var.data.identifier
+  db_name                         = var.data.db_name
+  username                        = var.data.username
+  password                        = null
+  manage_master_user_password     = true
+  master_user_secret_kms_key_id   = var.data.master_user_secret_kms_key_id
+  engine_version                  = var.data.engine_version
+  instance_class                  = var.data.instance_class
+  multi_az                        = var.data.multi_az
+  allocated_storage               = var.data.allocated_storage
+  max_allocated_storage           = var.data.max_allocated_storage
+  backup_retention_period         = var.data.backup_retention_period
+  preferred_backup_window         = var.data.preferred_backup_window
+  preferred_maintenance_window    = var.data.preferred_maintenance_window
+  final_snapshot_identifier       = var.data.final_snapshot_identifier
+  deletion_protection             = var.data.deletion_protection
+  skip_final_snapshot             = var.data.skip_final_snapshot
+  enable_performance_insights     = var.data.enable_performance_insights
+  performance_insights_kms_key_id = null
+  kms_key_id                      = null
+  enable_iam_database_auth        = var.data.enable_iam_database_auth
+  monitoring_interval_seconds     = var.data.monitoring_interval_seconds
+  enabled_cloudwatch_logs_exports = var.data.enabled_cloudwatch_logs_exports
+  rds_sg_id                       = var.data.rds_sg_id
+  db_subnet_ids                   = var.data.db_subnet_ids
+  enable_environment_suffix       = var.environment.enable_suffix
+  environment_name_override       = var.environment.name
+}

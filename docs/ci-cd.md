@@ -1,6 +1,6 @@
 # CI/CD Workflows
 
-This repository uses a focused workflow layout: smaller, purpose-specific workflow files under `.github/workflows/`, backed by shared composite actions in `.github/actions/`.
+The repository uses a focused workflow layout: smaller, purpose-specific workflow files under `.github/workflows/`, backed by shared composite actions in `.github/actions/`.
 
 - `actionlint.yml`
   - Lints workflow YAML and local composite actions.
@@ -10,8 +10,10 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
   - Uses GitHub's dependency review action with a `critical` severity failure threshold.
 - `ci-terraform.yml`
   - Runs on pull requests and pushes for Terraform/CI paths.
-  - Enforces `terraform fmt`, `terraform validate`, `tflint`, `gitleaks`, Checkov, Trivy config, and optional tfsec/Terrascan scans.
-  - Keeps tfsec enabled by default because the repo already has allowlist governance around it.
+  - Enforces `terraform fmt`, root parity checks, hardened `terraform validate`, native `terraform test` for reusable modules and deployment roots, root plan-based tag coverage reports, `tflint`, `gitleaks`, Checkov, Trivy config, and optional tfsec/Terrascan scans.
+  - Reuses the same retry/timeout-aware local wrappers for validate and test that the Make targets use.
+  - Fails the tag coverage gate only when taggable AWS resources are missing tag values; resource types that do not expose tag fields remain informational in the uploaded report artifacts.
+  - Treats Trivy config as the primary config scanner and keeps tfsec as an opt-in compatibility gate for teams that still want the older allowlist path.
   - Keeps Terrascan disabled by default until explicitly enabled.
 - `terraform-docs.yml`
   - Verifies `terraform-docs` output drift for reusable modules under `modules/`.
@@ -22,14 +24,15 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
 - `pr-plan.yml`
   - Runs speculative plans on same-repo pull requests only.
   - Resolves changed Terraform targets from `ci/terraform-targets.json`.
-  - Uploads plan text artifacts and updates a single sticky PR comment.
-  - Does not create saved plan files for later apply.
+  - Uploads sanitized plan/result/cost artifacts and updates a single sticky PR comment.
+  - Generates Infracost monthly cost estimates from Terraform plan JSON when `INFRACOST_API_KEY` is configured.
+  - Does not upload raw secret-backed plan text artifacts.
 - `deploy.yml`
   - Runs on `workflow_dispatch` only.
-  - Builds saved plan artifacts (`tfplan`, rendered plan text, plan JSON, checksum).
-  - Runs advisory Trivy scans against saved plan JSON before upload.
+  - Builds a saved plan for deployment review and approval.
+  - Uploads only sanitized deployment summaries/result artifacts; the apply job regenerates the approved plan after environment approval.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
-  - Applies the downloaded saved plan artifact only after GitHub Environment approval when `apply_after_plan=true`.
+  - Applies only after GitHub Environment approval when `apply_after_plan=true`.
 - `destroy.yml`
   - Runs on `workflow_dispatch` only.
   - Requires a confirmation string matching `destroy <target>` after whitespace normalization before any AWS credentials are used.
@@ -39,10 +42,20 @@ This repository uses a focused workflow layout: smaller, purpose-specific workfl
 - `live-validation.yml`
   - Runs nightly for scheduled validation targets and on demand for selected deployment roots.
   - Uses isolated local Terraform state, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
+  - Forces `live_validation_mode=true`, so the roots must use an isolated `lv-*` environment name instead of the normal `prod` / `nonprod` override.
+  - Uses a stable validation DNS label per root so the isolated Terraform workspace does not force a brand-new public hostname every run.
   - Expects dedicated live-validation tfvars secrets for each enabled target.
+  - Verifies CloudFront deployment state, Route53 alias records, and ACM certificate coverage for the generated frontend aliases before the app-profile smoke checks succeed.
   - Keep a target disabled until it has dedicated validation-only DNS and ACM certificates; do not point live validation at the exact hostnames used by a live environment.
-  - The repository currently keeps both app roots disabled for live validation because there are no dedicated validation-only DNS names and ACM certificates configured yet.
-  - Manual dispatch currently exposes only `prod-app`; with no enabled targets, the workflow reports that live validation is disabled.
+  - `prod-app` is intended for manual-only validation once its validation-only DNS/cert/secret prerequisites exist.
+  - `nonprod-app` is intended for manual and scheduled validation once its validation-only DNS/cert/secret prerequisites exist.
+- `terratest-live-validation.yml`
+  - Runs weekly for scheduled validation targets and on demand for selected deployment roots.
+  - Uses Go-based [Terratest](https://terratest.gruntwork.io/) to execute the same isolated apply/smoke/destroy path that `live-validation.yml` runs through `.scripts/run_live_validation.sh`.
+  - Supports the default app profile and optional extra scenario tfvars for `frontend_runtime_mode = "ecs"` and `backend_ingress_mode = "public_alb_restricted"` when those secrets are configured.
+  - Uploads the Terratest log bundle for the target root and is intended as an extra end-to-end compatibility check against Terraform/provider/AWS API drift.
+
+See [`docs/live-validation.md`](./live-validation.md) for the operator checklist, cost expectations, bootstrap flow, and troubleshooting path.
 
 ## Shared Actions
 
@@ -64,7 +77,8 @@ Scanner toggles:
 - `ENABLE_TRIVY_PLAN`
   - Default when unset: enabled
 - `ENABLE_TFSEC`
-  - Default when unset: enabled
+  - Default when unset: disabled
+  - Set it to `true` when you want the legacy tfsec compatibility gate in addition to Trivy
 - `ENABLE_TERRASCAN`
   - Default when unset: disabled
 
@@ -77,19 +91,37 @@ The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-
 
 ## Secrets
 
-Role secrets used by plan/apply workflows:
+Required repo secrets for the standard plan/apply/destroy workflows:
 
 - `AWS_ROLE_ARN_PROD_APP`
 - `AWS_ROLE_ARN_NONPROD_APP`
 - `TFVARS_PROD_APP`
 - `TFVARS_NONPROD_APP`
 
+Optional repo secrets:
+
+- `INFRACOST_API_KEY` for pull-request cost estimates only
+
 Live-validation tfvars secrets:
 
 - `LIVE_VALIDATION_TFVARS_PROD_APP`
 - `LIVE_VALIDATION_TFVARS_NONPROD_APP`
+- `LIVE_VALIDATION_TFVARS_FRONTEND_ECS_PROD_APP`
+- `LIVE_VALIDATION_TFVARS_FRONTEND_ECS_NONPROD_APP`
+- `LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_PROD_APP`
+- `LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_NONPROD_APP`
 
-Those live-validation tfvars secrets are only consumed if you later re-enable the corresponding target in `ci/terraform-targets.json`.
+Live validation also needs validation-only DNS names and matching ACM certificates baked into those tfvars values. Those tfvars now set a stable `live_validation_dns_label` such as `lv-prod` or `lv-nonprod`, while the Terraform workspace remains unique per run for safe state isolation.
+
+Environment-scoped secrets and variables are optional with the current workflow layout. The checked-in workflows read the repo-level values above by default, while GitHub environments still provide approval gates and a place to move secrets later if you want stricter separation.
+
+## Validation Bootstrap
+
+- `live-validation-bootstrap/`
+  - Dedicated helper root for provisioning validation-only ACM certificates and origin-auth SSM parameters.
+  - Intended to be applied before enabling `LIVE_VALIDATION_TFVARS_*` secrets in GitHub.
+  - Emits the exact certificate ARNs and parameter names needed to build those secrets.
+  - Does not create the workload itself; the workload still comes from the normal `prod-app` / `nonprod-app` roots during `live-validation.yml`.
 
 ## GitHub Environments
 
@@ -108,8 +140,8 @@ Configure required reviewers on all of those environments to gate applies and de
 ## Saved Plans vs PR Plans
 
 - Pull request plans are speculative and are used only for review feedback.
-- Deploy workflow plans are non-speculative saved plan files plus rendered plan output and plan JSON.
-- Apply consumes the saved plan artifact created earlier in the same workflow after environment approval.
+- Deploy workflow plans are non-speculative but their uploaded artifacts are sanitized summaries, not raw full-plan artifacts.
+- Apply regenerates the approved plan in the protected job after environment approval.
 
 ## Target Catalog
 
@@ -121,5 +153,7 @@ Configure required reviewers on all of those environments to gate applies and de
 - AWS role secret mapping
 - deploy environment name
 - live-validation eligibility and smoke profile
+
+That catalog structure is already suitable for a multi-account operating model where `prod-app` and `nonprod-app` assume different roles into different AWS accounts.
 
 Do not hardcode new Terraform targets directly into workflow YAML.

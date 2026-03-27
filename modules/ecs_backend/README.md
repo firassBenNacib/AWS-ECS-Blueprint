@@ -74,7 +74,7 @@ No modules.
 | environment_name_override | Optional explicit environment name used for ECS resource naming. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
 | exec_kms_key_arn | KMS key ARN for ECS Exec session encryption. | `string` | `null` | no |
 | exec_log_group_name | CloudWatch log group base name for ECS Exec audit logs. | `string` | `"app-backend-ecs-exec"` | no |
-| exec_log_retention_days | CloudWatch log retention for ECS Exec audit logs. | `number` | `30` | no |
+| exec_log_retention_days | CloudWatch log retention for ECS Exec audit logs. | `number` | `365` | no |
 | execution_role_name | IAM execution role name base for ECS tasks | `string` | `"ecs-backend-execution-role"` | no |
 | health_check_grace_period_seconds | ECS service health-check grace period in seconds. | `number` | `60` | no |
 | log_group_name | CloudWatch log group name base | `string` | `"app-backend"` | no |
@@ -90,6 +90,7 @@ No modules.
 | secret_kms_key_arns | Optional list of KMS key ARNs used to decrypt referenced secrets | `list(string)` | `[]` | no |
 | service_name | ECS service name base | `string` | `"app-backend-service"` | no |
 | task_cpu | Fargate task CPU units | `number` | `512` | no |
+| task_cpu_architecture | Fargate task CPU architecture. | `string` | `"ARM64"` | no |
 | task_family | ECS task definition family base | `string` | `"app-backend-task"` | no |
 | task_memory | Fargate task memory in MiB | `number` | `1024` | no |
 | task_role_name | IAM task role name base for ECS tasks | `string` | `"ecs-backend-task-role"` | no |

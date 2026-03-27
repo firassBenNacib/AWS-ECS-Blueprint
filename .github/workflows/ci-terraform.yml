@@ -40,12 +40,15 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   TF_IN_AUTOMATION: "1"
   TF_CLI_ARGS_init: "-input=false -lock-timeout=5m"
   TF_CLI_ARGS_plan: "-input=false -lock-timeout=5m"
   TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
+  TF_BACKEND_BUCKET: ${{ vars.TF_BACKEND_BUCKET }}
+  TF_BACKEND_REGION: ${{ vars.TF_BACKEND_REGION }}
   CHECKOV_VERSION: "3.2.507"
   TFSEC_VERSION: "v1.28.14"
   TERRASCAN_VERSION: "1.19.9"
@@ -84,8 +87,124 @@ jobs:
       - name: Terraform fmt
         run: terraform fmt -check -recursive
 
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install shellcheck
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck --version
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          mapfile -t shell_scripts < <(find .scripts -maxdepth 1 -type f -name '*.sh' | sort)
+          if [[ ${#shell_scripts[@]} -eq 0 ]]; then
+            echo "No shell scripts found."
+            exit 0
+          fi
+          shellcheck "${shell_scripts[@]}"
+
+  root-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check root parity
+        run: python3 .scripts/check_root_parity.py
+
   terraform-validate:
     name: terraform-validate (${{ matrix.label }})
+    if: needs.resolve-targets.outputs.count != '0'
+    needs:
+      - resolve-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-targets.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Terraform validate with local wrapper
+        run: bash .scripts/validate_targets.sh "${{ matrix.path }}"
+
+  terraform-validate-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+
+      - name: Terraform validate modules with local wrapper
+        run: bash .scripts/validate_modules.sh
+
+  terraform-test:
+    name: terraform-test (${{ matrix.path }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - path: modules/alb
+          - path: modules/application_platform
+          - path: modules/backup_baseline
+          - path: modules/budget_alerts
+          - path: modules/ecr
+          - path: modules/ecs_backend
+          - path: modules/network
+          - path: modules/rds
+          - path: modules/s3
+          - path: modules/security_baseline
+          - path: modules/security_groups
+          - path: modules/ecs_service
+          - path: modules/guardduty_member_detector
+          - path: modules/cloudfront_frontend
+          - path: modules/cloudfront_backend
+          - path: prod-app
+          - path: nonprod-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          enable-plugin-cache: "false"
+
+      - name: Terraform test with local wrapper
+        shell: bash
+        run: |
+          case "${{ matrix.path }}" in
+            prod-app|nonprod-app)
+              bash .scripts/test_roots.sh "${{ matrix.path }}"
+              ;;
+            modules/*)
+              bash .scripts/test_modules.sh "$(basename "${{ matrix.path }}")"
+              ;;
+            *)
+              echo "Unsupported Terraform test path: ${{ matrix.path }}" >&2
+              exit 1
+              ;;
+          esac
+
+  terraform-tag-report:
+    name: terraform-tag-report (${{ matrix.label }})
     if: needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
@@ -100,11 +219,65 @@ jobs:
       - name: Setup Terraform
         uses: ./.github/actions/setup-terraform
 
-      - name: Terraform init (no backend)
-        run: terraform -chdir="${{ matrix.path }}" init -backend=false
+      - name: Check tag report prerequisites
+        id: tag_prereqs
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Skipping tag report for fork pull requests because AWS role secrets are not available."
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
 
-      - name: Terraform validate
-        run: terraform -chdir="${{ matrix.path }}" validate
+          role_env_var="${{ matrix.role_env_var }}"
+          role_arn="$(printenv "${role_env_var}" || true)"
+
+          if [[ -z "${role_arn}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing AWS role secret for ${{ matrix.label }}."
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "skip=false"
+            echo "reason="
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Configure AWS Credentials
+        if: steps.tag_prereqs.outputs.skip != 'true'
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ matrix.role_env_var }}
+          role_label: ${{ matrix.label }}
+          aws_region: ${{ matrix.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
+      - name: Generate tag coverage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tag-reports
+          if [[ "${{ steps.tag_prereqs.outputs.skip }}" == "true" ]]; then
+            printf 'Terraform tag coverage report\nSource: plan:%s\n\n%s\n' "${{ matrix.path }}" "${{ steps.tag_prereqs.outputs.reason }}" | tee "tag-reports/${{ matrix.slug }}.txt"
+            exit 0
+          fi
+          STRICT=true make tag-plan-root ROOT="${{ matrix.path }}" TFVARS="$(basename "${{ matrix.tfvars_file }}")" | tee "tag-reports/${{ matrix.slug }}.txt"
+
+      - name: Upload tag coverage artifact
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: tag-report-${{ matrix.slug }}
+          retention-days: 30
+          path: tag-reports/${{ matrix.slug }}.txt
 
   tflint:
     name: tflint (${{ matrix.label }})
@@ -172,7 +345,7 @@ jobs:
 
   tfsec-policy:
     name: tfsec-policy (${{ matrix.label }})
-    if: vars.ENABLE_TFSEC != 'false' && needs.resolve-targets.outputs.count != '0'
+    if: vars.ENABLE_TFSEC == 'true' && needs.resolve-targets.outputs.count != '0'
     needs:
       - resolve-targets
     runs-on: ubuntu-latest
@@ -276,7 +449,12 @@ jobs:
     needs:
       - resolve-targets
       - terraform-fmt
+      - shellcheck
+      - root-parity
       - terraform-validate
+      - terraform-validate-modules
+      - terraform-test
+      - terraform-tag-report
       - tflint
       - checkov-policy
       - tfsec-policy

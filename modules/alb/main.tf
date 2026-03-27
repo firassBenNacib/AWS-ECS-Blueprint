@@ -10,7 +10,7 @@ locals {
 
 resource "aws_lb" "this" {
   name               = local.alb_name_final
-  internal           = true
+  internal           = var.internal
   load_balancer_type = "application"
   security_groups    = [var.alb_security_group_id]
   subnets            = var.alb_subnet_ids
@@ -75,35 +75,6 @@ resource "aws_lb_listener" "https" {
   }
 }
 
-resource "aws_lb_listener" "http_origin" {
-  count = var.enable_origin_http_listener ? 1 : 0
-
-  load_balancer_arn = aws_lb.this.arn
-  port              = var.origin_http_listener_port
-  protocol          = "HTTP"
-
-  dynamic "default_action" {
-    for_each = var.enable_origin_auth_header ? [] : [1]
-    content {
-      type             = "forward"
-      target_group_arn = aws_lb_target_group.backend.arn
-    }
-  }
-
-  dynamic "default_action" {
-    for_each = var.enable_origin_auth_header ? [1] : []
-    content {
-      type = "fixed-response"
-
-      fixed_response {
-        content_type = "text/plain"
-        message_body = "Forbidden"
-        status_code  = "403"
-      }
-    }
-  }
-}
-
 resource "aws_lb_listener_rule" "origin_auth_primary" {
   count = var.enable_origin_auth_header && trimspace(var.origin_auth_header_value) != "" ? 1 : 0
 
@@ -127,44 +98,6 @@ resource "aws_lb_listener_rule" "origin_auth_secondary" {
   count = var.enable_origin_auth_header && trimspace(var.origin_auth_previous_header_value) != "" ? 1 : 0
 
   listener_arn = aws_lb_listener.https.arn
-  priority     = 11
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    http_header {
-      http_header_name = var.origin_auth_previous_header_name
-      values           = [var.origin_auth_previous_header_value]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "origin_auth_primary_http" {
-  count = var.enable_origin_http_listener && var.enable_origin_auth_header && trimspace(var.origin_auth_header_value) != "" ? 1 : 0
-
-  listener_arn = aws_lb_listener.http_origin[0].arn
-  priority     = 10
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    http_header {
-      http_header_name = var.origin_auth_header_name
-      values           = [var.origin_auth_header_value]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "origin_auth_secondary_http" {
-  count = var.enable_origin_http_listener && var.enable_origin_auth_header && trimspace(var.origin_auth_previous_header_value) != "" ? 1 : 0
-
-  listener_arn = aws_lb_listener.http_origin[0].arn
   priority     = 11
 
   action {

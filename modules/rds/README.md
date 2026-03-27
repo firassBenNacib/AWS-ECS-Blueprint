@@ -45,7 +45,8 @@ No modules.
 | enable_environment_suffix | Suffix RDS identifiers with environment | `bool` | `false` | no |
 | enable_iam_database_auth | Enable IAM database authentication | `bool` | `true` | no |
 | enable_performance_insights | Enable Performance Insights when the chosen DB engine/class combination supports it. | `bool` | `false` | no |
-| enabled_cloudwatch_logs_exports | RDS log types exported to CloudWatch Logs | `list(string)` | <pre>[<br/>  "error",<br/>  "general",<br/>  "slowquery"<br/>]</pre> | no |
+| enabled_cloudwatch_logs_exports | RDS log types exported to CloudWatch Logs | `list(string)` | <pre>[<br/>  "audit",<br/>  "error",<br/>  "general",<br/>  "slowquery"<br/>]</pre> | no |
+| engine_version | RDS engine version for the MySQL instance. | `string` | `"8.4.8"` | no |
 | environment_name_override | Optional explicit environment name used for RDS naming. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
 | final_snapshot_identifier | Optional final snapshot identifier used on instance deletion | `string` | `null` | no |
 | identifier | RDS instance identifier | `string` | `"app-rds"` | no |
@@ -55,6 +56,7 @@ No modules.
 | master_user_secret_kms_key_id | Optional KMS key ARN for RDS-managed master user secret | `string` | `null` | no |
 | max_allocated_storage | Maximum allocated storage in GB for autoscaling. Set to 0 to disable. | `number` | `0` | no |
 | monitoring_interval_seconds | Enhanced monitoring interval in seconds (0 disables enhanced monitoring) | `number` | `60` | no |
+| multi_az | Enable Multi-AZ deployment for the RDS instance. | `bool` | `true` | no |
 | password | Master password (required only when manage_master_user_password=false) | `string` | `null` | no |
 | performance_insights_kms_key_id | Optional KMS key ARN for Performance Insights | `string` | `null` | no |
 | preferred_backup_window | Daily time range during which automated backups are created (UTC). | `string` | `"03:00-04:00"` | no |

@@ -10,6 +10,7 @@ CHECKOV_STRICT_ALLOWLIST="${CHECKOV_STRICT_ALLOWLIST:-}"
 CHECKOV_LOG_LEVEL="${CHECKOV_LOG_LEVEL:-ERROR}"
 CHECKOV_ALLOWLIST_FILE="${ALLOWLIST_DIR}/checkov_skipped_allowlist.txt"
 CHECKOV_SKIP_PATHS="${CHECKOV_SKIP_PATHS:-}"
+ROOT_LABEL="${WORKDIR}"
 
 if [[ -z "${CHECKOV_SKIP_PATHS}" && "${WORKDIR}" == "." ]]; then
   CHECKOV_SKIP_PATHS="nonprod-app,prod-app"
@@ -42,7 +43,7 @@ test -f "${CHECKOV_ALLOWLIST_FILE}" || {
   exit 1
 }
 
-echo "Running checkov (failed checks must be zero)..."
+echo "[root:${ROOT_LABEL}][checkov] Running checkov (failed checks must be zero)..."
 CHECKOV_ARGS=(-d "${WORKDIR}" --framework terraform -o json)
 
 if [[ -n "${CHECKOV_SKIP_PATHS}" ]]; then
@@ -55,9 +56,11 @@ if [[ -n "${CHECKOV_SKIP_PATHS}" ]]; then
   done
 fi
 
-LOG_LEVEL="${CHECKOV_LOG_LEVEL}" checkov "${CHECKOV_ARGS[@]}" > "${OUT_DIR}/checkov.json" || true
+if ! LOG_LEVEL="${CHECKOV_LOG_LEVEL}" checkov "${CHECKOV_ARGS[@]}" > "${OUT_DIR}/checkov.json"; then
+  :
+fi
 
-python3 - "${OUT_DIR}/checkov.json" "${CHECKOV_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${CHECKOV_STRICT_ALLOWLIST}" <<'PY'
+python3 - "${OUT_DIR}/checkov.json" "${CHECKOV_ALLOWLIST_FILE}" "${MAX_ALLOWLIST_DAYS}" "${CHECKOV_STRICT_ALLOWLIST}" <<'PY' | sed -e "s/^/[root:${ROOT_LABEL}][checkov] /"
 import json
 import re
 import sys

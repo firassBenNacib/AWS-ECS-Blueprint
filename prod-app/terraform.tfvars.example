@@ -1,10 +1,5 @@
 # Project identity: change when using this repo as a template for another project.
 project_name                       = "example-app"
-# Optional: set to a real DR ALB/API domain for CloudFront failover; null = use primary ALB.
-backend_failover_domain_name     = null
-# Optional backend CloudFront geo restriction. Use "none", "whitelist", or "blacklist".
-backend_geo_restriction_type     = "none"
-backend_geo_locations            = []
 frontend_geo_restriction_type    = "none"
 frontend_geo_locations           = []
 
@@ -13,6 +8,7 @@ dr_region                        = "us-west-2"
 prod_app_role_arn                = null
 environment_domain                 = "example.com"
 route53_zone_id                  = null
+route53_zone_strategy            = "create"
 bucket_name                      = "example-app-frontend-prod"
 availability_zones               = ["eu-west-1a", "eu-west-1b"]
 vpc_cidr                         = "10.30.0.0/16"
@@ -20,8 +16,12 @@ public_app_subnet_cidrs          = ["10.30.1.0/24", "10.30.2.0/24"]
 private_app_subnet_cidrs         = ["10.30.21.0/24", "10.30.22.0/24"]
 private_db_subnet_cidrs          = ["10.30.11.0/24", "10.30.12.0/24"]
 private_app_nat_mode             = "required"
+enable_cost_optimized_dev_tier   = false
+backend_ingress_mode             = "vpc_origin_alb"
+allowed_image_registries         = ["444444444444.dkr.ecr.eu-west-1.amazonaws.com/example-app-backend-prod"]
 backend_container_image          = "444444444444.dkr.ecr.eu-west-1.amazonaws.com/example-app-backend-prod@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 backend_origin_protocol_policy   = "https-only"
+enable_origin_auth_header        = false
 acm_cert_frontend                = "arn:aws:acm:us-east-1:444444444444:certificate/22222222-2222-2222-2222-222222222222"
 alb_certificate_arn              = "arn:aws:acm:eu-west-1:444444444444:certificate/33333333-3333-3333-3333-333333333333"
 backend_cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
@@ -29,12 +29,35 @@ backend_origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 origin_auth_header_ssm_parameter_name = "/example-app/prod/origin-auth/current"
 cloudfront_logs_bucket_name      = "example-app-cf-logs-prod"
 rds_instance_class               = "db.t4g.small"
+rds_multi_az                     = true
+enable_rds_master_user_password_rotation = true
+rds_master_user_password_rotation_automatically_after_days = 30
 rds_enable_performance_insights  = false
 rds_username                     = "appadmin"
 enable_security_baseline         = true
 enable_account_security_controls = true
 # In single-account mode, keep AWS Config enabled in exactly one app root.
 enable_aws_config                = true
+enable_ecs_exec_audit_alerts     = true
+
+# Optional monthly AWS Budgets alerts for cost visibility.
+# enable_budget_alerts            = true
+# budget_alert_email_addresses    = ["platform@example.com"]
+# budget_alert_topic_arns         = []
+# budget_alert_threshold_percentages = [80, 100]
+# budget_total_monthly_limit      = 500
+# budget_cloudfront_monthly_limit = 150
+# budget_vpc_monthly_limit        = 100
+# budget_rds_monthly_limit        = 200
+
+# Optional workload operational alarms. Leave topic null to reuse the managed
+# security findings topic when the security baseline is enabled.
+# enable_operational_alarms                 = true
+# operational_alarm_topic_arn              = null
+# operational_alarm_alb_target_5xx_threshold = 10
+# operational_alarm_ecs_running_task_min_threshold = 1
+# operational_alarm_rds_cpu_threshold      = 80
+# operational_alarm_cloudfront_5xx_rate_threshold = 5
 
 org_id                 = "o-xxxxxxxxxx"
 security_account_id    = "111111111111"

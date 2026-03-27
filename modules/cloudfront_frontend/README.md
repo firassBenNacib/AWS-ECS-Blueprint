@@ -48,7 +48,7 @@ No modules.
 | backend_origin_domain_name | ALB domain name used as the backend origin when backend_origin_enabled=true. | `string` | `""` | no |
 | backend_origin_enabled | When true, add a private ALB origin and ordered cache behaviors for backend/API paths. | `bool` | `false` | no |
 | backend_origin_https_port | Backend ALB listener port exposed to CloudFront. | `number` | `443` | no |
-| backend_origin_protocol_policy | CloudFront-to-backend origin protocol policy. | `string` | `"https-only"` | no |
+| backend_origin_protocol_policy | CloudFront-to-backend origin protocol policy. Only HTTPS is supported. | `string` | `"https-only"` | no |
 | backend_origin_request_policy_id | CloudFront origin request policy ID for backend/API path behaviors. | `string` | `"b689b0a8-53d0-40ab-baf2-68738e2966ac"` | no |
 | backend_origin_vpc_origin_id | Optional CloudFront VPC origin ID for the backend ALB origin. | `string` | `null` | no |
 | backend_path_patterns | Ordered cache behavior path patterns routed to the private backend origin. | `list(string)` | <pre>[<br/>  "/api/*",<br/>  "/auth/*",<br/>  "/audit/*",<br/>  "/notify/*",<br/>  "/mailer/*",<br/>  "/gateway/*"<br/>]</pre> | no |

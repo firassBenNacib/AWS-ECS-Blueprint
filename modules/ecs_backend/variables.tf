@@ -90,6 +90,17 @@ variable "task_memory" {
   default     = 1024
 }
 
+variable "task_cpu_architecture" {
+  description = "Fargate task CPU architecture."
+  type        = string
+  default     = "ARM64"
+
+  validation {
+    condition     = contains(["ARM64", "X86_64"], var.task_cpu_architecture)
+    error_message = "task_cpu_architecture must be ARM64 or X86_64."
+  }
+}
+
 variable "desired_count" {
   description = "Desired ECS task count"
   type        = number
@@ -153,7 +164,7 @@ variable "exec_log_group_name" {
 variable "exec_log_retention_days" {
   description = "CloudWatch log retention for ECS Exec audit logs."
   type        = number
-  default     = 30
+  default     = 365
 }
 
 variable "scale_in_cooldown_seconds" {
