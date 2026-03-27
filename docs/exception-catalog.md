@@ -1,6 +1,6 @@
 # Scanner Exception Catalog
 
-This catalog classifies current ignored/skipped controls into governance categories.
+The catalog below classifies current ignored and skipped controls into governance categories.
 
 ## Required Structural Exceptions
 
