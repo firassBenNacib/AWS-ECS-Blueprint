@@ -320,6 +320,12 @@ variable "origin_auth_header_ssm_parameter_name" {
   type        = string
 }
 
+variable "enable_origin_auth_header" {
+  description = "Enable CloudFront origin custom-header authentication for the backend origin."
+  type        = bool
+  default     = true
+}
+
 variable "cloudfront_logs_bucket_name" {
   description = "CloudFront access logs bucket name."
   type        = string

@@ -63,6 +63,7 @@ module "app" {
   private_app_nat_mode                                       = var.private_app_nat_mode
   enable_cost_optimized_dev_tier                             = var.enable_cost_optimized_dev_tier
   backend_origin_protocol_policy                             = var.backend_origin_protocol_policy
+  enable_origin_auth_header                                  = var.enable_origin_auth_header
   origin_auth_header_ssm_parameter_name                      = var.origin_auth_header_ssm_parameter_name
   cloudfront_logs_bucket_name                                = var.cloudfront_logs_bucket_name
   rds_instance_class                                         = var.rds_instance_class
