@@ -12,7 +12,6 @@ locals {
       "backend_ingress_mode            = \"vpc_origin_alb\"",
       "frontend_runtime_mode           = \"s3\"",
       format("allowed_image_registries        = %s", jsonencode(var.validation_allowed_image_registries)),
-      "backend_geo_restriction_type    = \"none\"",
       "frontend_geo_restriction_type   = \"none\"",
       "frontend_geo_locations          = []",
       "destroy_mode_enabled            = true",

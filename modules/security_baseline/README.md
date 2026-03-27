@@ -104,6 +104,7 @@ No modules.
 | enable_inspector | Enable Amazon Inspector account scanning. | `bool` | `true` | no |
 | enable_log_bucket_object_lock | Enable S3 Object Lock on the primary security baseline log bucket. | `bool` | `false` | no |
 | enable_security_hub | Enable Security Hub account integration and standards subscriptions | `bool` | `true` | no |
+| inspector_resource_types | Amazon Inspector resource types to enable for account scanning. | `list(string)` | <pre>[<br/>  "ECR",<br/>  "EC2"<br/>]</pre> | no |
 | log_bucket_dr_name | Optional DR-region replica bucket name for security baseline logs. When unset, Terraform derives one from log_bucket_name and dr_region. | `string` | `null` | no |
 | log_bucket_force_destroy | Force deletion of security baseline log buckets during teardown. | `bool` | `false` | no |
 | object_lock_days | S3 Object Lock GOVERNANCE-mode retention period in days for the CloudTrail/Config log bucket. Prevents accidental deletion of audit logs. | `number` | `365` | no |

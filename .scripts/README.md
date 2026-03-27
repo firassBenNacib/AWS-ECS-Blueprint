@@ -45,6 +45,7 @@ This directory contains the repository's local operator and CI helper scripts.
   - Applies, smoke-tests, and destroys an isolated validation environment.
 - `run_live_validation_checks.sh`
   - Shared smoke-check logic used by the live validation path.
+  - Verifies TLS by default; use `LIVE_VALIDATION_INSECURE_TLS=true` only when you intentionally need an insecure bootstrap smoke check.
 
 ## Documentation
 

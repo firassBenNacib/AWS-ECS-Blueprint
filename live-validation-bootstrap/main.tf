@@ -33,28 +33,6 @@ locals {
       root_variable_name          = "nonprod_app_role_arn"
     }
   }
-
-  frontend_cert_dns_records = merge([
-    for target_id, target in local.targets : {
-      for dvo in aws_acm_certificate.frontend[target_id].domain_validation_options :
-      "${target_id}/${dvo.domain_name}" => {
-        name   = dvo.resource_record_name
-        record = dvo.resource_record_value
-        type   = dvo.resource_record_type
-      }
-    }
-  ]...)
-
-  alb_cert_dns_records = merge([
-    for target_id, target in local.targets : {
-      for dvo in aws_acm_certificate.alb[target_id].domain_validation_options :
-      "${target_id}/${dvo.domain_name}" => {
-        name   = dvo.resource_record_name
-        record = dvo.resource_record_value
-        type   = dvo.resource_record_type
-      }
-    }
-  ]...)
 }
 
 resource "random_password" "origin_auth_current" {
@@ -87,25 +65,22 @@ resource "aws_acm_certificate" "frontend" {
 }
 
 resource "aws_route53_record" "frontend_cert_validation" {
-  for_each = local.frontend_cert_dns_records
+  for_each = local.targets
 
   allow_overwrite = true
   zone_id         = var.route53_zone_id
-  name            = each.value.name
-  records         = [each.value.record]
+  name            = tolist(aws_acm_certificate.frontend[each.key].domain_validation_options)[0].resource_record_name
+  records         = [tolist(aws_acm_certificate.frontend[each.key].domain_validation_options)[0].resource_record_value]
   ttl             = 60
-  type            = each.value.type
+  type            = tolist(aws_acm_certificate.frontend[each.key].domain_validation_options)[0].resource_record_type
 }
 
 resource "aws_acm_certificate_validation" "frontend" {
   for_each = local.targets
   provider = aws.us_east_1
 
-  certificate_arn = aws_acm_certificate.frontend[each.key].arn
-  validation_record_fqdns = [
-    for dvo in aws_acm_certificate.frontend[each.key].domain_validation_options :
-    aws_route53_record.frontend_cert_validation["${each.key}/${dvo.domain_name}"].fqdn
-  ]
+  certificate_arn         = aws_acm_certificate.frontend[each.key].arn
+  validation_record_fqdns = [aws_route53_record.frontend_cert_validation[each.key].fqdn]
 }
 
 resource "aws_acm_certificate" "alb" {
@@ -120,22 +95,19 @@ resource "aws_acm_certificate" "alb" {
 }
 
 resource "aws_route53_record" "alb_cert_validation" {
-  for_each = local.alb_cert_dns_records
+  for_each = local.targets
 
   allow_overwrite = true
   zone_id         = var.route53_zone_id
-  name            = each.value.name
-  records         = [each.value.record]
+  name            = tolist(aws_acm_certificate.alb[each.key].domain_validation_options)[0].resource_record_name
+  records         = [tolist(aws_acm_certificate.alb[each.key].domain_validation_options)[0].resource_record_value]
   ttl             = 60
-  type            = each.value.type
+  type            = tolist(aws_acm_certificate.alb[each.key].domain_validation_options)[0].resource_record_type
 }
 
 resource "aws_acm_certificate_validation" "alb" {
   for_each = local.targets
 
-  certificate_arn = aws_acm_certificate.alb[each.key].arn
-  validation_record_fqdns = [
-    for dvo in aws_acm_certificate.alb[each.key].domain_validation_options :
-    aws_route53_record.alb_cert_validation["${each.key}/${dvo.domain_name}"].fqdn
-  ]
+  certificate_arn         = aws_acm_certificate.alb[each.key].arn
+  validation_record_fqdns = [aws_route53_record.alb_cert_validation[each.key].fqdn]
 }

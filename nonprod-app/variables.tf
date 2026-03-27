@@ -257,6 +257,18 @@ variable "rds_multi_az" {
   default     = false
 }
 
+variable "enable_rds_iam_auth" {
+  description = "Enable IAM database authentication for the non-production RDS instance."
+  type        = bool
+  default     = true
+}
+
+variable "rds_backup_retention_period" {
+  description = "RDS backup retention period in days for the non-production database."
+  type        = number
+  default     = 14
+}
+
 variable "enable_rds_master_user_password_rotation" {
   description = "Enable automatic rotation for the non-production RDS master user secret."
   type        = bool
@@ -273,6 +285,12 @@ variable "availability_zones" {
   description = "AZs for VPC subnet tiers."
   type        = list(string)
   default     = ["eu-west-1a", "eu-west-1b"]
+}
+
+variable "vpc_name" {
+  description = "Name for the non-production VPC."
+  type        = string
+  default     = "app-vpc"
 }
 
 variable "vpc_cidr" {
@@ -326,6 +344,12 @@ variable "origin_auth_header_ssm_parameter_name" {
   type        = string
 }
 
+variable "origin_auth_previous_header_ssm_parameter_name" {
+  description = "Optional SSM parameter name for the previous origin authentication header value."
+  type        = string
+  default     = ""
+}
+
 variable "enable_origin_auth_header" {
   description = "Enable CloudFront origin custom-header authentication for the backend origin."
   type        = bool
@@ -354,10 +378,28 @@ variable "enable_security_baseline" {
   default     = true
 }
 
+variable "enable_inspector" {
+  description = "Enable Amazon Inspector for account-level vulnerability scanning."
+  type        = bool
+  default     = true
+}
+
+variable "inspector_resource_types" {
+  description = "Amazon Inspector resource types to enable for account-level vulnerability scanning."
+  type        = list(string)
+  default     = ["ECR", "EC2"]
+}
+
 variable "enable_managed_waf" {
   description = "Enable managed WAF protection for the non-production root."
   type        = bool
   default     = true
+}
+
+variable "backend_web_acl_arn" {
+  description = "Optional WAFv2 Web ACL ARN for the backend CloudFront path."
+  type        = string
+  default     = null
 }
 
 variable "enable_aws_backup" {
@@ -456,10 +498,37 @@ variable "enable_account_security_controls" {
   default     = true
 }
 
+variable "security_findings_sns_topic_arn" {
+  description = "Optional existing SNS topic ARN receiving high/critical security findings."
+  type        = string
+  default     = null
+}
+
+variable "security_findings_sns_subscriptions" {
+  description = "Optional managed-topic subscriptions for security findings notifications."
+  type = list(object({
+    protocol = string
+    endpoint = string
+  }))
+  default = []
+}
+
 variable "enable_aws_config" {
   description = "Enable AWS Config recorder and delivery channel in the workload account baseline."
   type        = bool
   default     = true
+}
+
+variable "enable_cloudtrail_data_events" {
+  description = "Enable CloudTrail data event selectors for high-value resources."
+  type        = bool
+  default     = false
+}
+
+variable "cloudtrail_data_event_resources" {
+  description = "CloudTrail data-event resource ARNs for the non-production root."
+  type        = list(string)
+  default     = []
 }
 
 variable "ecs_exec_log_retention_days" {

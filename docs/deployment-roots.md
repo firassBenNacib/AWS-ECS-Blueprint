@@ -15,7 +15,7 @@ Each deployment root includes:
 
 Optional cost-visibility inputs such as `enable_budget_alerts`, `budget_alert_email_addresses`, and the per-service monthly budget limits are supported by both roots, even when they are omitted from the curated example profiles.
 
-The checked-in `nonprod-app/terraform.tfvars` uses a low-cost non-production profile with `private_app_nat_mode = "canary"` so private services still reach external providers through one NAT gateway. The default `nonprod-app/terraform.tfvars.example` remains the ultra-cheap profile. It turns on `enable_cost_optimized_dev_tier`, which disables NAT gateways, disables managed WAF and per-root AWS Backup, keeps RDS single-AZ, clamps ECS service counts to `1/1/1`, and disables account-level security controls for that root.
+The repository ships example tfvars profiles such as `nonprod-app/terraform.tfvars.example`. Create a real `terraform.tfvars` locally or inject it through CI secrets; do not commit it. The default non-production example remains the ultra-cheap profile. It turns on `enable_cost_optimized_dev_tier`, which disables NAT gateways, disables managed WAF and per-root AWS Backup, keeps RDS single-AZ, clamps ECS service counts to `1/1/1`, and disables account-level security controls for that root. If you want a low-cost profile that still keeps private services on a single NAT gateway, prefer `private_app_nat_mode = "canary"` in your local or secret-managed tfvars.
 
 The public repository path is intentionally platform-only. Multi-account bootstrap roots are not part of the supported surface in this repo.
 

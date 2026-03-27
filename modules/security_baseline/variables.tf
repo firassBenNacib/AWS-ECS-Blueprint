@@ -77,6 +77,12 @@ variable "enable_inspector" {
   default     = true
 }
 
+variable "inspector_resource_types" {
+  description = "Amazon Inspector resource types to enable for account scanning."
+  type        = list(string)
+  default     = ["ECR", "EC2"]
+}
+
 variable "enable_aws_config" {
   description = "Enable AWS Config recorder and delivery channel."
   type        = bool
