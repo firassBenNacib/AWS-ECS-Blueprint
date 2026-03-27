@@ -153,7 +153,7 @@ jobs:
           terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" > "${plan_txt}" 2>&1
 
           set +e
-          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -detailed-exitcode -input=false -lock=false -out="${plan_bin}" -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -detailed-exitcode -input=false -lock-timeout=5m -out="${plan_bin}" -no-color -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
           exit_code=$?
           set -e
 

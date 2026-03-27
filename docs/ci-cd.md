@@ -26,6 +26,7 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Resolves changed Terraform targets from `ci/terraform-targets.json`.
   - Uploads sanitized plan/result/cost artifacts and updates a single sticky PR comment.
   - Generates Infracost monthly cost estimates from Terraform plan JSON when `INFRACOST_API_KEY` is configured.
+  - Uses backend locking with a 5-minute timeout so speculative plan jobs do not bypass S3 lockfile safety.
   - Does not upload raw secret-backed plan text artifacts.
 - `deploy.yml`
   - Runs on `workflow_dispatch` only.
@@ -36,6 +37,7 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
 - `drift-detection.yml`
   - Runs weekly and on demand.
   - Reuses the normal root backend and tfvars wiring to detect live-state drift without applying changes.
+  - Uses backend locking with a 5-minute timeout so drift checks do not race against concurrent apply jobs.
   - Fails when Terraform returns a detailed-exitcode drift plan and uploads the drift plan artifact for review.
 - `destroy.yml`
   - Runs on `workflow_dispatch` only.
