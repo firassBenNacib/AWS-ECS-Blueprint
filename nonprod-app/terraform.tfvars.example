@@ -30,6 +30,7 @@ origin_auth_header_ssm_parameter_name = "/example-app/nonprod/origin-auth/curren
 cloudfront_logs_bucket_name      = "example-app-cf-logs-nonprod"
 rds_instance_class               = "db.t4g.micro"
 rds_multi_az                     = false
+# Intentional cheapest nonprod default: keep WAF off unless you want the higher-protection profile.
 enable_managed_waf               = false
 enable_aws_backup                = false
 enable_rds_master_user_password_rotation = true
