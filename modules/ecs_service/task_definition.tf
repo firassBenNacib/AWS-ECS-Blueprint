@@ -8,6 +8,11 @@ resource "aws_ecs_task_definition" "this" {
   task_role_arn            = aws_iam_role.task.arn
   container_definitions    = jsonencode([local.container_definition])
 
+  runtime_platform {
+    cpu_architecture        = var.task_cpu_architecture
+    operating_system_family = "LINUX"
+  }
+
   dynamic "volume" {
     for_each = {
       for volume in var.task_volumes : volume.name => volume

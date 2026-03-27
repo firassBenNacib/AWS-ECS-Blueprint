@@ -4,6 +4,9 @@ locals {
   ) ? trimspace(var.environment_name_override) : terraform.workspace
   identifier_final                = var.enable_environment_suffix ? "${var.identifier}-${local.environment_name}" : var.identifier
   final_snapshot_identifier_final = coalesce(var.final_snapshot_identifier, "${local.identifier_final}-final")
+  mysql_major_family              = startswith(var.engine_version, "8.4") ? "8.4" : "8.0"
+  default_parameter_group_name    = "default.mysql${local.mysql_major_family}"
+  default_option_group_name       = "default:mysql-${replace(local.mysql_major_family, ".", "-")}"
 }
 
 data "aws_iam_policy_document" "enhanced_monitoring_assume_role" {
@@ -53,8 +56,8 @@ resource "aws_db_instance" "this" {
   manage_master_user_password         = var.manage_master_user_password
   master_user_secret_kms_key_id       = var.manage_master_user_password ? var.master_user_secret_kms_key_id : null
   db_name                             = var.db_name
-  parameter_group_name                = "default.mysql8.0"
-  option_group_name                   = "default:mysql-8-0"
+  parameter_group_name                = local.default_parameter_group_name
+  option_group_name                   = local.default_option_group_name
   publicly_accessible                 = false
   multi_az                            = var.multi_az
   storage_encrypted                   = true

@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   TF_IN_AUTOMATION: "1"
@@ -218,11 +219,56 @@ jobs:
       - name: Setup Terraform
         uses: ./.github/actions/setup-terraform
 
+      - name: Check tag report prerequisites
+        id: tag_prereqs
+        env:
+          AWS_ROLE_ARN_PROD_APP: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          AWS_ROLE_ARN_NONPROD_APP: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Skipping tag report for fork pull requests because AWS role secrets are not available."
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          role_env_var="${{ matrix.role_env_var }}"
+          role_arn="$(printenv "${role_env_var}" || true)"
+
+          if [[ -z "${role_arn}" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Missing AWS role secret for ${{ matrix.label }}."
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "skip=false"
+            echo "reason="
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Configure AWS Credentials
+        if: steps.tag_prereqs.outputs.skip != 'true'
+        uses: ./.github/actions/configure-aws-credentials
+        with:
+          role_env_var: ${{ matrix.role_env_var }}
+          role_label: ${{ matrix.label }}
+          aws_region: ${{ matrix.aws_region }}
+          aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
+          aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
+
       - name: Generate tag coverage report
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p tag-reports
+          if [[ "${{ steps.tag_prereqs.outputs.skip }}" == "true" ]]; then
+            printf 'Terraform tag coverage report\nSource: plan:%s\n\n%s\n' "${{ matrix.path }}" "${{ steps.tag_prereqs.outputs.reason }}" | tee "tag-reports/${{ matrix.slug }}.txt"
+            exit 0
+          fi
           STRICT=true make tag-plan-root ROOT="${{ matrix.path }}" TFVARS="${{ matrix.tfvars_file }}" | tee "tag-reports/${{ matrix.slug }}.txt"
 
       - name: Upload tag coverage artifact

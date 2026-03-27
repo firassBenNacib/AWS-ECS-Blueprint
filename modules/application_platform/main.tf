@@ -579,6 +579,7 @@ module "app_runtime" {
     drop_capabilities                            = var.backend_drop_linux_capabilities
     task_cpu                                     = var.backend_task_cpu
     task_memory                                  = var.backend_task_memory
+    task_cpu_architecture                        = var.backend_task_cpu_architecture
     desired_count                                = module.deployment_contract.effective_backend_desired_count
     min_count                                    = module.deployment_contract.effective_backend_min_count
     max_count                                    = module.deployment_contract.effective_backend_max_count

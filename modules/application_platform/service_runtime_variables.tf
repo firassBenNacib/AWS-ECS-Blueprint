@@ -61,6 +61,7 @@ variable "ecs_services" {
     max_count                         = optional(number)
     cpu                               = optional(number)
     memory                            = optional(number)
+    cpu_architecture                  = optional(string)
     health_check_grace_period_seconds = optional(number)
     health_check_path                 = optional(string)
     container_user                    = optional(string)
@@ -313,6 +314,17 @@ variable "backend_task_memory" {
   description = "Fargate task memory in MiB"
   type        = number
   default     = 1024
+}
+
+variable "backend_task_cpu_architecture" {
+  description = "Fargate CPU architecture for the backend task definition."
+  type        = string
+  default     = "ARM64"
+
+  validation {
+    condition     = contains(["ARM64", "X86_64"], var.backend_task_cpu_architecture)
+    error_message = "backend_task_cpu_architecture must be ARM64 or X86_64."
+  }
 }
 
 variable "backend_desired_count" {

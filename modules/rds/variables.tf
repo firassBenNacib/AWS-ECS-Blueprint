@@ -47,7 +47,7 @@ variable "instance_class" {
 variable "engine_version" {
   description = "RDS engine version for the MySQL instance."
   type        = string
-  default     = "8.0.45"
+  default     = "8.4.8"
 }
 
 variable "multi_az" {

@@ -45,6 +45,11 @@ run "service_defaults_are_private_and_fargate" {
     condition     = aws_ecs_service.this.enable_execute_command == false
     error_message = "ECS Exec should be disabled by default."
   }
+
+  assert {
+    condition     = aws_ecs_task_definition.this.runtime_platform[0].cpu_architecture == "ARM64"
+    error_message = "ECS services should default to ARM64."
+  }
 }
 
 run "autoscaling_defaults_are_applied" {

@@ -68,6 +68,7 @@ module "app" {
   cloudfront_logs_bucket_name                                = var.cloudfront_logs_bucket_name
   rds_instance_class                                         = var.rds_instance_class
   rds_engine_version                                         = var.rds_engine_version
+  backend_task_cpu_architecture                              = var.backend_task_cpu_architecture
   rds_multi_az                                               = var.rds_multi_az
   rds_enable_performance_insights                            = var.rds_enable_performance_insights
   enable_rds_master_user_password_rotation                   = var.enable_rds_master_user_password_rotation

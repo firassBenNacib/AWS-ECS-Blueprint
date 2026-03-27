@@ -236,7 +236,13 @@ variable "rds_instance_class" {
 variable "rds_engine_version" {
   description = "RDS engine version for the production database."
   type        = string
-  default     = "8.0.45"
+  default     = "8.4.8"
+}
+
+variable "backend_task_cpu_architecture" {
+  description = "Fargate CPU architecture for the default backend task definition."
+  type        = string
+  default     = "ARM64"
 }
 
 variable "rds_enable_performance_insights" {

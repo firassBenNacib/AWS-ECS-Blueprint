@@ -41,6 +41,11 @@ run "default_backend_service_is_private_and_scaled" {
   }
 
   assert {
+    condition     = aws_ecs_task_definition.this.runtime_platform[0].cpu_architecture == "ARM64"
+    error_message = "Backend ECS tasks should default to ARM64."
+  }
+
+  assert {
     condition     = length(aws_cloudwatch_log_group.exec) == 0
     error_message = "ECS Exec log group should not exist unless ECS Exec is enabled."
   }

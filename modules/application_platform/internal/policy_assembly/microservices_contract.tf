@@ -11,6 +11,7 @@ locals {
       max_count                                    = var.runtime.cost_optimized_dev_tier_enabled ? 1 : coalesce(try(service.max_count, null), 2)
       cpu                                          = coalesce(try(service.cpu, null), 512)
       memory                                       = coalesce(try(service.memory, null), 1024)
+      cpu_architecture                             = coalesce(try(service.cpu_architecture, null), "ARM64")
       alb_request_count_target_value               = try(service.alb_request_count_target_value, null)
       alb_request_count_scale_in_cooldown_seconds  = coalesce(try(service.alb_request_count_scale_in_cooldown_seconds, null), 300)
       alb_request_count_scale_out_cooldown_seconds = coalesce(try(service.alb_request_count_scale_out_cooldown_seconds, null), 60)

@@ -97,6 +97,7 @@ module "ecs_backend" {
   drop_capabilities                            = var.single_backend.drop_capabilities
   task_cpu                                     = var.single_backend.task_cpu
   task_memory                                  = var.single_backend.task_memory
+  task_cpu_architecture                        = var.single_backend.task_cpu_architecture
   desired_count                                = var.single_backend.desired_count
   min_count                                    = var.single_backend.min_count
   max_count                                    = var.single_backend.max_count
@@ -165,6 +166,7 @@ module "ecs_service" {
 
   task_cpu                               = each.value.cpu
   task_memory                            = each.value.memory
+  task_cpu_architecture                  = each.value.cpu_architecture
   desired_count                          = each.value.desired_count
   min_count                              = each.value.min_count
   max_count                              = each.value.max_count

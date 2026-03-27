@@ -46,7 +46,7 @@ No modules.
 | enable_iam_database_auth | Enable IAM database authentication | `bool` | `true` | no |
 | enable_performance_insights | Enable Performance Insights when the chosen DB engine/class combination supports it. | `bool` | `false` | no |
 | enabled_cloudwatch_logs_exports | RDS log types exported to CloudWatch Logs | `list(string)` | <pre>[<br/>  "audit",<br/>  "error",<br/>  "general",<br/>  "slowquery"<br/>]</pre> | no |
-| engine_version | RDS engine version for the MySQL instance. | `string` | `"8.0.45"` | no |
+| engine_version | RDS engine version for the MySQL instance. | `string` | `"8.4.8"` | no |
 | environment_name_override | Optional explicit environment name used for RDS naming. Leave null to derive it from the current Terraform context. | `string` | `null` | no |
 | final_snapshot_identifier | Optional final snapshot identifier used on instance deletion | `string` | `null` | no |
 | identifier | RDS instance identifier | `string` | `"app-rds"` | no |
