@@ -151,7 +151,7 @@ variable "exec_log_group_name" {
 variable "exec_log_retention_days" {
   description = "CloudWatch log retention in days for ECS Exec logs."
   type        = number
-  default     = 30
+  default     = 365
 }
 
 variable "scale_in_cooldown_seconds" {

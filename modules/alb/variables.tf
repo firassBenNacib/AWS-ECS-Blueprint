@@ -8,6 +8,12 @@ variable "alb_subnet_ids" {
   type        = list(string)
 }
 
+variable "internal" {
+  description = "Whether the ALB is internal-only."
+  type        = bool
+  default     = true
+}
+
 variable "alb_security_group_id" {
   description = "Security group ID attached to ALB"
   type        = string
@@ -23,18 +29,6 @@ variable "alb_listener_port" {
   description = "Primary ALB HTTPS listener port"
   type        = number
   default     = 443
-}
-
-variable "enable_origin_http_listener" {
-  description = "Create an internal HTTP listener dedicated to CloudFront VPC-origin traffic."
-  type        = bool
-  default     = false
-}
-
-variable "origin_http_listener_port" {
-  description = "Port used by the optional internal HTTP listener for CloudFront VPC-origin traffic."
-  type        = number
-  default     = 80
 }
 
 variable "certificate_arn" {

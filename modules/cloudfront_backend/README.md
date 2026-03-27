@@ -42,7 +42,7 @@ No modules.
 | access_logs_prefix | Prefix used for backend CloudFront log objects | `string` | `"cloudfront/backend/"` | no |
 | allowed_methods | HTTP methods accepted by the backend distribution. | `list(string)` | <pre>[<br/>  "GET",<br/>  "HEAD",<br/>  "OPTIONS",<br/>  "PUT",<br/>  "POST",<br/>  "PATCH",<br/>  "DELETE"<br/>]</pre> | no |
 | app_port | Backend ALB listener port used by CloudFront origin | `number` | `8080` | no |
-| backend_failover_protocol_policy | CloudFront-to-secondary-origin protocol policy | `string` | `"https-only"` | no |
+| backend_failover_protocol_policy | CloudFront-to-secondary-origin protocol policy. Only HTTPS is supported. | `string` | `"https-only"` | no |
 | backend_vpc_origin_id | Optional CloudFront VPC origin ID for the primary backend origin. | `string` | `null` | no |
 | enable_environment_suffix | Suffix aliases and tags with environment | `bool` | `false` | no |
 | enable_origin_auth_header | Enable custom origin authentication headers | `bool` | `true` | no |
@@ -54,7 +54,7 @@ No modules.
 | origin_auth_header_value | Primary custom header value for origin auth | `string` | `""` | no |
 | origin_auth_previous_header_name | Secondary custom header name for origin auth rotation | `string` | `"X-Origin-Verify-Prev"` | no |
 | origin_auth_previous_header_value | Secondary custom header value for origin auth rotation | `string` | `""` | no |
-| origin_protocol_policy | CloudFront-to-origin protocol policy | `string` | `"https-only"` | no |
+| origin_protocol_policy | CloudFront-to-origin protocol policy. Only HTTPS is supported. | `string` | `"https-only"` | no |
 | price_class | CloudFront price class | `string` | `"PriceClass_100"` | no |
 | response_headers_policy_id | Response headers policy ID for backend default cache behavior | `string` | `"67f7725c-6f97-4210-82d7-5512b31e9d03"` | no |
 | viewer_protocol_policy | Viewer protocol policy for the backend distribution default cache behavior | `string` | `"redirect-to-https"` | no |
@@ -64,8 +64,8 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| backend_distribution_arn | n/a |
-| backend_distribution_id | n/a |
-| backend_hosted_zone_id | n/a |
-| backend_url | n/a |
+| backend_distribution_arn | Backend CloudFront distribution ARN. |
+| backend_distribution_id | Backend CloudFront distribution ID. |
+| backend_hosted_zone_id | Backend CloudFront distribution Route53 hosted zone ID. |
+| backend_url | Backend CloudFront distribution domain name. |
 <!-- END_TF_DOCS -->

@@ -4,9 +4,11 @@ locals {
   ) ? trimspace(var.environment_name_override) : terraform.workspace
   is_prod = local.environment_name == "prod"
 
-  frontend_aliases_final = var.enable_environment_suffix && var.environment_domain != "" ? (
-    local.is_prod ? [var.environment_domain, "www.${var.environment_domain}"] : ["${local.environment_name}.${var.environment_domain}", "www.${local.environment_name}.${var.environment_domain}"]
-  ) : var.frontend_aliases
+  frontend_aliases_final = length(var.frontend_aliases) > 0 ? var.frontend_aliases : (
+    var.enable_environment_suffix && var.environment_domain != "" ? (
+      local.is_prod ? [var.environment_domain, "www.${var.environment_domain}"] : ["${local.environment_name}.${var.environment_domain}", "www.${local.environment_name}.${var.environment_domain}"]
+    ) : []
+  )
 
   environment_tag = var.enable_environment_suffix ? upper(local.environment_name) : "DEFAULT"
   oac_name = var.enable_environment_suffix ? format(

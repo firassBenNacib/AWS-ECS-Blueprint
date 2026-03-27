@@ -43,7 +43,7 @@ resource "aws_db_subnet_group" "this" {
 resource "aws_db_instance" "this" {
   identifier                          = local.identifier_final
   engine                              = "mysql"
-  engine_version                      = "8.0.40"
+  engine_version                      = var.engine_version
   instance_class                      = var.instance_class
   allocated_storage                   = var.allocated_storage
   max_allocated_storage               = var.max_allocated_storage
@@ -56,7 +56,7 @@ resource "aws_db_instance" "this" {
   parameter_group_name                = "default.mysql8.0"
   option_group_name                   = "default:mysql-8-0"
   publicly_accessible                 = false
-  multi_az                            = true
+  multi_az                            = var.multi_az
   storage_encrypted                   = true
   kms_key_id                          = var.kms_key_id
   backup_retention_period             = var.backup_retention_period

@@ -1,0 +1,46 @@
+# Frontend ECS mode example for production-like environments.
+# Start from this profile when you want CloudFront frontend traffic to target ALB/ECS instead of the private S3 frontend origin.
+
+project_name                        = "example-app"
+frontend_geo_restriction_type       = "none"
+frontend_geo_locations              = []
+
+aws_region                          = "eu-west-1"
+dr_region                           = "us-west-2"
+prod_app_role_arn                   = null
+environment_domain                  = "example.com"
+route53_zone_id                     = null
+route53_zone_strategy               = "create"
+bucket_name                         = "example-app-frontend-prod"
+availability_zones                  = ["eu-west-1a", "eu-west-1b"]
+vpc_cidr                            = "10.30.0.0/16"
+public_app_subnet_cidrs             = ["10.30.1.0/24", "10.30.2.0/24"]
+private_app_subnet_cidrs            = ["10.30.21.0/24", "10.30.22.0/24"]
+private_db_subnet_cidrs             = ["10.30.11.0/24", "10.30.12.0/24"]
+private_app_nat_mode                = "required"
+enable_cost_optimized_dev_tier      = false
+frontend_runtime_mode               = "ecs"
+backend_ingress_mode                = "vpc_origin_alb"
+backend_container_image             = "444444444444.dkr.ecr.eu-west-1.amazonaws.com/example-app-backend-prod@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+backend_origin_protocol_policy      = "https-only"
+acm_cert_frontend                   = "arn:aws:acm:us-east-1:444444444444:certificate/22222222-2222-2222-2222-222222222222"
+alb_certificate_arn                 = "arn:aws:acm:eu-west-1:444444444444:certificate/33333333-3333-3333-3333-333333333333"
+backend_cache_policy_id             = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+backend_origin_request_policy_id    = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+origin_auth_header_ssm_parameter_name = "/example-app/prod/origin-auth/current"
+cloudfront_logs_bucket_name         = "example-app-cf-logs-prod"
+rds_instance_class                  = "db.t4g.small"
+rds_multi_az                        = true
+enable_rds_master_user_password_rotation = true
+rds_master_user_password_rotation_automatically_after_days = 30
+rds_enable_performance_insights     = false
+rds_username                        = "appadmin"
+enable_security_baseline            = true
+enable_account_security_controls    = true
+enable_aws_config                   = true
+enable_ecs_exec_audit_alerts        = true
+
+org_id                 = "o-xxxxxxxxxx"
+security_account_id    = "111111111111"
+log_archive_account_id = "222222222222"
+prod_account_id        = "444444444444"

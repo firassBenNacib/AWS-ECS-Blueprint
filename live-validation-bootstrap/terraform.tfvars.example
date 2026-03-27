@@ -1,0 +1,5 @@
+project_name               = "example-app"
+environment_domain         = "example.com"
+route53_zone_id            = "Z111111EXAMPLE"
+prod_validation_dns_label  = "lv-prod"
+nonprod_validation_dns_label = "lv-nonprod"

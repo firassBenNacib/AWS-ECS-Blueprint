@@ -83,6 +83,12 @@ variable "enable_aws_config" {
   default     = true
 }
 
+variable "enable_ecs_exec_audit_alerts" {
+  description = "Enable EventBridge alerts for ECS Exec shell access observed via CloudTrail."
+  type        = bool
+  default     = false
+}
+
 variable "log_bucket_dr_name" {
   description = "Optional DR-region replica bucket name for security baseline logs. When unset, Terraform derives one from log_bucket_name and dr_region."
   type        = string

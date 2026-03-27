@@ -66,7 +66,7 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| bucket_arn | n/a |
-| bucket_domain_name | n/a |
-| bucket_name | n/a |
+| bucket_arn | Frontend S3 bucket ARN. |
+| bucket_domain_name | Frontend S3 bucket regional domain name used for CloudFront origin. |
+| bucket_name | Frontend S3 bucket name. |
 <!-- END_TF_DOCS -->

@@ -36,17 +36,6 @@ resource "aws_security_group" "backend_alb" {
     protocol        = "tcp"
     prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
   }
-
-  dynamic "ingress" {
-    for_each = var.http_origin_listener_port == null ? [] : [var.http_origin_listener_port]
-    content {
-      description     = "Internal HTTP listener from CloudFront origin-facing infrastructure"
-      from_port       = ingress.value
-      to_port         = ingress.value
-      protocol        = "tcp"
-      prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
-    }
-  }
 }
 
 resource "aws_security_group" "backend_service" {

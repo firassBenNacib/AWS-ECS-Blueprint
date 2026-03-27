@@ -1,0 +1,55 @@
+variable "workspace_name" {
+  type = string
+}
+
+variable "settings" {
+  type = object({
+    environment_name_override        = string
+    app_runtime_mode                 = string
+    backend_ingress_mode             = string
+    frontend_runtime_mode            = string
+    enable_cost_optimized_dev_tier   = bool
+    enable_security_baseline         = bool
+    enable_account_security_controls = bool
+    enable_aws_config                = bool
+    enable_aws_backup                = bool
+    enable_inspector                 = bool
+    enable_ecs_exec_audit_alerts     = bool
+    enable_environment_suffix        = bool
+    environment_domain               = string
+    route53_zone_id                  = string
+    route53_zone_strategy            = string
+    live_validation_dns_label        = string
+    live_validation_mode             = bool
+    bucket_name                      = string
+    s3_access_logs_bucket_name       = string
+    cloudfront_logs_bucket_name      = string
+    dr_frontend_bucket_name          = string
+    dr_cloudfront_logs_bucket_name   = string
+    s3_kms_key_id                    = string
+    dr_s3_kms_key_id                 = string
+    destroy_mode_enabled             = bool
+    s3_force_destroy                 = bool
+    alb_deletion_protection          = bool
+    backend_ecr_repository_name      = string
+    project_name                     = string
+    account_id                       = string
+    partition                        = string
+    aws_region                       = string
+    dr_region                        = string
+    private_app_nat_mode             = string
+    rds_multi_az                     = bool
+    backend_desired_count            = number
+    backend_min_count                = number
+    backend_max_count                = number
+    securityhub_standards_arns       = list(string)
+    allowed_image_registries         = list(string)
+    backend_container_image          = string
+    service_discovery_namespace_name = string
+    alb_access_logs_prefix           = string
+    enable_managed_waf               = bool
+    alb_web_acl_arn                  = string
+    frontend_web_acl_arn             = string
+    backend_web_acl_arn              = string
+  })
+}
