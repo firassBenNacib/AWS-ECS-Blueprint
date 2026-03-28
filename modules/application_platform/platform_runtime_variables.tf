@@ -63,7 +63,7 @@ variable "destroy_mode_enabled" {
 }
 
 variable "s3_versioning_enabled" {
-  description = "Enable frontend bucket versioning"
+  description = "Deprecated compatibility input. Frontend bucket versioning is always enabled."
   type        = bool
   default     = true
 }
