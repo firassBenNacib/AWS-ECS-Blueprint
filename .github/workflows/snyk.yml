@@ -1,0 +1,112 @@
+name: Snyk
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  SNYK_ORG: firassbennacib
+
+jobs:
+  snyk-open-source:
+    name: Snyk Open Source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      configured: ${{ steps.snyk-token.outputs.configured }}
+    steps:
+      - name: Detect Snyk token
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "${SNYK_TOKEN}" ]; then
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk open-source scan."
+          fi
+
+      - name: Checkout
+        if: steps.snyk-token.outputs.configured == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        if: steps.snyk-token.outputs.configured == 'true'
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: tests/terratest/go.mod
+
+      - name: Test Terratest module dependencies
+        if: steps.snyk-token.outputs.configured == 'true'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          npx -y snyk test \
+            --org="${SNYK_ORG}" \
+            --file=tests/terratest/go.mod \
+            --package-manager=gomodules
+
+  snyk-iac:
+    name: Snyk IaC
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      configured: ${{ steps.snyk-token.outputs.configured }}
+    steps:
+      - name: Detect Snyk token
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "${SNYK_TOKEN}" ]; then
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk IaC scan."
+          fi
+
+      - name: Checkout
+        if: steps.snyk-token.outputs.configured == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Test Terraform configuration
+        if: steps.snyk-token.outputs.configured == 'true'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          npx -y snyk iac test . \
+            --org="${SNYK_ORG}" \
+            --severity-threshold=medium
+
+  snyk-status:
+    name: Snyk
+    if: always()
+    needs:
+      - snyk-open-source
+      - snyk-iac
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate Snyk results
+        run: |
+          python3 - <<'PY'
+          import json
+
+          needs = json.loads(r'''${{ toJson(needs) }}''')
+          failures = {
+              name: data["result"]
+              for name, data in needs.items()
+              if data["result"] not in ("success", "skipped")
+          }
+          if failures:
+              raise SystemExit(f"Snyk workflow failures: {failures}")
+          if all(data.get("outputs", {}).get("configured") == "false" for data in needs.values()):
+              print("SNYK_TOKEN is not configured; Snyk jobs were skipped.")
+          else:
+              print("Snyk workflow passed.")
+          PY

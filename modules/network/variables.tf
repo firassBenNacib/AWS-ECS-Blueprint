@@ -64,6 +64,20 @@ variable "interface_endpoint_services" {
     "secretsmanager",
     "kms"
   ]
+
+  validation {
+    condition = alltrue([
+      for service in var.interface_endpoint_services : contains([
+        "ecr.api",
+        "ecr.dkr",
+        "logs",
+        "sts",
+        "secretsmanager",
+        "kms"
+      ], service)
+    ])
+    error_message = "interface_endpoint_services currently supports ecr.api, ecr.dkr, logs, sts, secretsmanager, and kms."
+  }
 }
 
 variable "private_app_nat_mode" {
