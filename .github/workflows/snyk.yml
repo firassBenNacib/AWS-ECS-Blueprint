@@ -52,6 +52,38 @@ jobs:
             --file=tests/terratest/go.mod \
             --package-manager=gomodules
 
+  snyk-code:
+    name: Snyk Code
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      configured: ${{ steps.snyk-token.outputs.configured }}
+    steps:
+      - name: Detect Snyk token
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "${SNYK_TOKEN}" ]; then
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk Code scan."
+          fi
+
+      - name: Checkout
+        if: steps.snyk-token.outputs.configured == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Test repository source code
+        if: steps.snyk-token.outputs.configured == 'true'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          npx -y snyk code test \
+            --org="${SNYK_ORG}" \
+            --severity-threshold=medium
+
   snyk-iac:
     name: Snyk IaC
     runs-on: ubuntu-latest
@@ -89,6 +121,7 @@ jobs:
     if: always()
     needs:
       - snyk-open-source
+      - snyk-code
       - snyk-iac
     runs-on: ubuntu-latest
     steps:
