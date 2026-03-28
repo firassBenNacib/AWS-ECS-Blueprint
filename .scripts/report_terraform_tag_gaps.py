@@ -4,12 +4,15 @@ import collections
 import json
 import sys
 
+from path_safety import resolve_existing_file
+
 
 def load_document(path: str):
     if path == "-":
         return json.load(sys.stdin)
 
-    with open(path, "r", encoding="utf-8") as handle:
+    input_path = resolve_existing_file(path, description="Terraform JSON document")
+    with input_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 

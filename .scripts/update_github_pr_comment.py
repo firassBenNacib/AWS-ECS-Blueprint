@@ -6,18 +6,26 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import urllib.error
 import urllib.request
-from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any
+
+from path_safety import resolve_existing_file
 
 
 API_BASE = "https://api.github.com"
 JsonObject = dict[str, Any]
 JsonList = list[JsonObject]
+REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 def api_request(method: str, url: str, token: str, payload: dict[str, Any] | None = None) -> JsonObject | JsonList:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc != "api.github.com":
+        raise ValueError(f"Only GitHub API requests are allowed, got {url}")
+
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",
@@ -53,8 +61,10 @@ def main() -> int:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise RuntimeError("GITHUB_TOKEN is required")
+    if not REPO_PATTERN.fullmatch(args.repo):
+        raise ValueError(f"Invalid repository identifier: {args.repo}")
 
-    body = Path(args.body_file).read_text()
+    body = resolve_existing_file(args.body_file, description="PR comment body file", include_temp=False).read_text(encoding="utf-8")
     comments_url = f"{API_BASE}/repos/{args.repo}/issues/{args.pr_number}/comments?per_page=100"
     comments_response = api_request("GET", comments_url, token)
     if not isinstance(comments_response, list):

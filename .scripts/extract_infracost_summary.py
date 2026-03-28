@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
+
+from path_safety import resolve_existing_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,7 +66,8 @@ def format_decimal(value: Decimal | None) -> str:
 
 def main() -> int:
     args = parse_args()
-    data = json.loads(Path(args.infracost_json).read_text(encoding="utf-8"))
+    infracost_json = resolve_existing_file(args.infracost_json, description="Infracost JSON file")
+    data = json.loads(infracost_json.read_text(encoding="utf-8"))
     projects = data.get("projects") or []
     if not isinstance(projects, list):
         projects = []

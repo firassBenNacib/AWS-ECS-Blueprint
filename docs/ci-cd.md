@@ -10,7 +10,7 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Uses GitHub's dependency review action with a `critical` severity failure threshold.
 - `snyk.yml`
   - Runs explicit Snyk scans on pull requests and pushes to `main`.
-  - Tests the Terratest Go module for open-source dependency issues and scans Terraform for IaC findings.
+  - Tests the Terratest Go module for open-source dependency issues, scans repository code with Snyk Code, and scans Terraform for IaC findings.
   - Gates IaC findings at `medium` severity and above so manual-only S3 MFA-delete gaps and dedicated log-sink bucket limitations stay informational instead of breaking CI.
 - `ci-terraform.yml`
   - Runs on pull requests and pushes for Terraform/CI paths.
@@ -112,7 +112,7 @@ Required repo secrets for the standard plan/apply/destroy workflows:
 Optional repo secrets:
 
 - `INFRACOST_API_KEY` for pull-request cost estimates only
-- `SNYK_TOKEN` for explicit Snyk open-source and IaC scans
+- `SNYK_TOKEN` for explicit Snyk open-source, code, and IaC scans
 
 The checked-in [`infracost.yml`](../infracost.yml) is for local `infracost breakdown` usage only. The pull-request workflow intentionally uses speculative plan JSON plus repo-secret tfvars so the PR cost comment matches the actual target inputs more closely.
 
