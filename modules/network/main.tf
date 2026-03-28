@@ -8,6 +8,8 @@ resource "aws_vpc" "this" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 data "aws_region" "current" {}
 
 data "aws_prefix_list" "s3" {
@@ -29,6 +31,62 @@ locals {
       "0" = 0
     } : {}
   )
+  interface_endpoint_actions = {
+    "ecr.api" = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:DescribeImages",
+      "ecr:DescribeRepositories",
+      "ecr:GetAuthorizationToken",
+      "ecr:GetDownloadUrlForLayer"
+    ]
+    "ecr.dkr" = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetAuthorizationToken",
+      "ecr:GetDownloadUrlForLayer"
+    ]
+    "kms" = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:ReEncryptFrom",
+      "kms:ReEncryptTo"
+    ]
+    "logs" = [
+      "logs:CreateLogStream",
+      "logs:DescribeLogStreams",
+      "logs:PutLogEvents"
+    ]
+    "secretsmanager" = [
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetSecretValue"
+    ]
+    "sts" = [
+      "sts:AssumeRole",
+      "sts:GetCallerIdentity"
+    ]
+  }
+  s3_gateway_endpoint_actions = [
+    "s3:AbortMultipartUpload",
+    "s3:DeleteObject",
+    "s3:DeleteObjectVersion",
+    "s3:GetBucketAcl",
+    "s3:GetBucketLocation",
+    "s3:GetObject",
+    "s3:GetObjectAttributes",
+    "s3:GetObjectTagging",
+    "s3:GetObjectVersion",
+    "s3:GetObjectVersionTagging",
+    "s3:ListBucket",
+    "s3:ListBucketMultipartUploads",
+    "s3:ListMultipartUploadParts",
+    "s3:PutObject",
+    "s3:PutObjectAcl",
+    "s3:PutObjectTagging"
+  ]
 }
 
 resource "aws_default_security_group" "lockdown" {
@@ -169,6 +227,29 @@ resource "aws_security_group" "interface_endpoints" {
   egress = []
 }
 
+data "aws_iam_policy_document" "interface_endpoint" {
+  for_each = toset(var.interface_endpoint_services)
+
+  statement {
+    sid    = "AllowSameAccountEndpointUse"
+    effect = "Allow"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions   = local.interface_endpoint_actions[each.key]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
 resource "aws_vpc_endpoint" "interface" {
   for_each = toset(var.interface_endpoint_services)
 
@@ -178,6 +259,28 @@ resource "aws_vpc_endpoint" "interface" {
   subnet_ids          = aws_subnet.private_app[*].id
   security_group_ids  = [aws_security_group.interface_endpoints.id]
   private_dns_enabled = true
+  policy              = data.aws_iam_policy_document.interface_endpoint[each.key].json
+}
+
+data "aws_iam_policy_document" "s3_gateway_endpoint" {
+  statement {
+    sid    = "AllowSameAccountS3EndpointUse"
+    effect = "Allow"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions   = local.s3_gateway_endpoint_actions
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
 }
 
 resource "aws_route_table" "public_edge" {
@@ -260,6 +363,7 @@ resource "aws_vpc_endpoint" "s3_gateway" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
+  policy            = data.aws_iam_policy_document.s3_gateway_endpoint.json
 
   route_table_ids = concat(
     aws_route_table.private_app[*].id,

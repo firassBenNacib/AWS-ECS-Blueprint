@@ -241,6 +241,7 @@ The repository uses a focused workflow set under [`.github/workflows/`](./.githu
 
 - `ci-terraform.yml`: Terraform formatting, validation, linting, and security scanning
 - `dependency-review.yml`: dependency and supply-chain review on pull requests
+- `snyk.yml`: explicit Snyk open-source and Terraform IaC scanning
 - `pr-plan.yml`: speculative Terraform plans for pull requests
 - `drift-detection.yml`: weekly or on-demand plan-only drift detection against live backend state
 - `deploy.yml`: saved-plan deployment flow with GitHub environment approval
@@ -266,6 +267,7 @@ Repository secrets required for the normal GitHub OIDC plan, deploy, and destroy
 Optional repository secrets:
 
 - `INFRACOST_API_KEY` for pull request monthly-cost estimates in `pr-plan.yml`
+- `SNYK_TOKEN` for explicit Snyk open-source and IaC scans
 - `LIVE_VALIDATION_TFVARS_*` only when you intentionally enable live-validation workflows
 
 The checked-in [`infracost.yml`](./infracost.yml) is kept for local `infracost breakdown` usage. The GitHub PR workflow intentionally uses speculative Terraform plan JSON plus repo-secret tfvars instead of that file so the PR cost comment tracks the actual target inputs more closely.
