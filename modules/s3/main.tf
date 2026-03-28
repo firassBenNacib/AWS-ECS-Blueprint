@@ -39,7 +39,8 @@ resource "aws_s3_bucket_versioning" "frontend_versioning" {
   bucket = aws_s3_bucket.frontend.id
 
   versioning_configuration {
-    status = var.versioning_enabled ? "Enabled" : "Disabled"
+    # Keep the input for backward compatibility, but always enforce versioning.
+    status = "Enabled"
   }
 }
 
@@ -85,7 +86,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend_lifecycle" {
     }
 
     dynamic "noncurrent_version_expiration" {
-      for_each = var.versioning_enabled && var.lifecycle_noncurrent_expiration_days != null ? [1] : []
+      for_each = var.lifecycle_noncurrent_expiration_days != null ? [1] : []
       content {
         noncurrent_days = var.lifecycle_noncurrent_expiration_days
       }

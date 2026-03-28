@@ -37,6 +37,19 @@ run "versioning_enabled_by_default" {
   }
 }
 
+run "versioning_enabled_even_when_compat_input_is_false" {
+  command = plan
+
+  variables {
+    versioning_enabled = false
+  }
+
+  assert {
+    condition     = aws_s3_bucket_versioning.frontend_versioning.versioning_configuration[0].status == "Enabled"
+    error_message = "S3 bucket versioning should remain enabled when the deprecated compatibility input is false."
+  }
+}
+
 run "bucket_owner_enforced" {
   command = plan
 
