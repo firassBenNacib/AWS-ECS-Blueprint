@@ -15,19 +15,35 @@ env:
 jobs:
   snyk-open-source:
     name: Snyk Open Source
-    if: secrets.SNYK_TOKEN != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      configured: ${{ steps.snyk-token.outputs.configured }}
     steps:
+      - name: Detect Snyk token
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "${SNYK_TOKEN}" ]; then
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk open-source scan."
+          fi
+
       - name: Checkout
+        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Go
+        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: tests/terratest/go.mod
 
       - name: Test Terratest module dependencies
+        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -38,14 +54,29 @@ jobs:
 
   snyk-iac:
     name: Snyk IaC
-    if: secrets.SNYK_TOKEN != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      configured: ${{ steps.snyk-token.outputs.configured }}
     steps:
+      - name: Detect Snyk token
+        id: snyk-token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "${SNYK_TOKEN}" ]; then
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk IaC scan."
+          fi
+
       - name: Checkout
+        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test Terraform configuration
+        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -74,7 +105,7 @@ jobs:
           }
           if failures:
               raise SystemExit(f"Snyk workflow failures: {failures}")
-          if all(data["result"] == "skipped" for data in needs.values()):
+          if all(data.get("outputs", {}).get("configured") == "false" for data in needs.values()):
               print("SNYK_TOKEN is not configured; Snyk jobs were skipped.")
           else:
               print("Snyk workflow passed.")
