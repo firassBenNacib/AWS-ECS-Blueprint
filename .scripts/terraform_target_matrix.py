@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from path_safety import resolve_existing_file
+
 
 ALL_TARGET_TRIGGER_PREFIXES = (
     ".github/workflows/",
@@ -184,7 +186,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    catalog = load_catalog(Path(args.catalog))
+    catalog = load_catalog(resolve_existing_file(args.catalog, description="Terraform target catalog", include_temp=False))
 
     if args.mode == "full":
         selected = list(catalog)
