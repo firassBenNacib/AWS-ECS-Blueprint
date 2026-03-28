@@ -12,11 +12,10 @@ locals {
     { (var.backend.backend_rds_secret_env_var_name) = var.app_data.master_user_secret_arn }
   )
 
-  smtp_host_final = "email-smtp.${var.runtime.aws_region}.amazonaws.com"
   microservice_env_placeholders = {
     "__RDS_ENDPOINT__" = var.app_data.address
     "__RDS_DB_NAME__"  = var.runtime.rds_db_name
-    "__SMTP_HOST__"    = local.smtp_host_final
+    "__SMTP_HOST__"    = var.runtime.smtp_host
   }
   microservice_secret_placeholders = {
     "__RDS_MASTER_PASSWORD_SECRET_ARN__" = "${var.app_data.master_user_secret_arn}:password::"

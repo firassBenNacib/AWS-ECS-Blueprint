@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a GitHub Actions apply matrix from saved plan result artifacts."""
+"""Build a GitHub Actions apply matrix from deploy plan result artifacts."""
 
 from __future__ import annotations
 

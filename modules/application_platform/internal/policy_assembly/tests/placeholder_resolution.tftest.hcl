@@ -4,7 +4,7 @@ variables {
     cost_optimized_dev_tier_enabled = false
     project_name                    = "example-app"
     environment_name                = "nonprod"
-    aws_region                      = "eu-west-1"
+    smtp_host                       = "email-smtp.eu-west-1.amazonaws.com"
     rds_db_name                     = "app"
     rds_username                    = "admin"
   }

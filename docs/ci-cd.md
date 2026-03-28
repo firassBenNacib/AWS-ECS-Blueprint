@@ -30,8 +30,9 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Does not upload raw secret-backed plan text artifacts.
 - `deploy.yml`
   - Runs on `workflow_dispatch` only.
-  - Builds a saved plan for deployment review and approval.
-  - Uploads only sanitized deployment summaries/result artifacts; the apply job regenerates the approved plan after environment approval.
+  - Builds a deployment plan for review and approval.
+  - Uploads only sanitized deployment summaries/result artifacts; it does not upload raw deploy `tfplan` binaries or full plan JSON.
+  - The protected apply job regenerates a saved plan after environment approval and applies that in the same job.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
   - Applies only after GitHub Environment approval when `apply_after_plan=true`.
 - `drift-detection.yml`
@@ -66,7 +67,7 @@ See [`docs/live-validation.md`](./live-validation.md) for the operator checklist
 ## Shared Actions
 
 - `.github/actions/setup-terraform`
-  - Installs Terraform and enables the shared provider plugin cache used across CI and deploy jobs.
+  - Installs the pinned Terraform CLI version and enables the shared provider plugin cache used across CI and deploy jobs.
 - `.github/actions/configure-aws-credentials`
   - Resolves the target-specific AWS role secret and assumes it with GitHub OIDC.
 - `.github/actions/actionlint`
@@ -149,7 +150,7 @@ Configure required reviewers on all of those environments to gate applies and de
 
 - Pull request plans are speculative and are used only for review feedback.
 - Deploy workflow plans are non-speculative but their uploaded artifacts are sanitized summaries, not raw full-plan artifacts.
-- Apply regenerates the approved plan in the protected job after environment approval.
+- Apply regenerates a saved plan in the protected job after environment approval and applies it there.
 
 ## Target Catalog
 
