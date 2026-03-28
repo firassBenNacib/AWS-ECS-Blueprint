@@ -221,7 +221,7 @@ Shared application deployment used by the `prod-app` and `nonprod-app` deploymen
 | s3_lifecycle_abort_incomplete_multipart_upload_days | Abort incomplete multipart uploads in frontend S3 bucket after this many days | `number` | `7` | no |
 | s3_lifecycle_expiration_days | Optional expiration age (days) for current frontend S3 objects | `number` | `null` | no |
 | s3_lifecycle_noncurrent_expiration_days | Optional expiration age (days) for noncurrent frontend S3 object versions | `number` | `30` | no |
-| s3_versioning_enabled | Enable frontend bucket versioning | `bool` | `true` | no |
+| s3_versioning_enabled | Deprecated compatibility input. Frontend bucket versioning is always enabled. | `bool` | `true` | no |
 | security_baseline_enable_object_lock | Enable S3 Object Lock on the security baseline audit-log bucket. | `bool` | `false` | no |
 | security_baseline_log_retention_days | Retention in days for account-level security baseline log storage lifecycle. | `number` | `365` | no |
 | security_findings_sns_subscriptions | Optional managed-topic subscriptions for security findings notifications. | <pre>list(object({<br/>    protocol = string<br/>    endpoint = string<br/>  }))</pre> | `[]` | no |

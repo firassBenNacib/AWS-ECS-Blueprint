@@ -10,7 +10,7 @@ variable "force_destroy" {
 }
 
 variable "versioning_enabled" {
-  description = "Enable bucket versioning"
+  description = "Deprecated compatibility input. Bucket versioning is always enabled and this value is ignored."
   type        = bool
   default     = true
 }

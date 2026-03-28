@@ -60,7 +60,7 @@ No modules.
 | replication_prerequisite_ids | Opaque dependency IDs that must exist before replication is configured. | `list(string)` | `[]` | no |
 | replication_replica_kms_key_id | Optional replica-region KMS key ARN used for replicated objects. | `string` | `null` | no |
 | replication_role_arn | Optional IAM role ARN used for bucket replication. | `string` | `null` | no |
-| versioning_enabled | Enable bucket versioning | `bool` | `true` | no |
+| versioning_enabled | Deprecated compatibility input. Bucket versioning is always enabled and this value is ignored. | `bool` | `true` | no |
 
 ## Outputs
 
