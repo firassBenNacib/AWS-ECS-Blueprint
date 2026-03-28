@@ -21,6 +21,16 @@ locals {
   )
   discovered_route53_zone_id   = local.discovered_route53_zone_found ? data.external.existing_public_route53_zone[0].result.zone_id : null
   discovered_route53_zone_name = local.discovered_route53_zone_found ? data.external.existing_public_route53_zone[0].result.zone_name : null
+  validated_s3_bucket_names = distinct(compact([
+    var.guardrails.frontend_bucket_name,
+    var.guardrails.s3_access_logs_bucket_name_final,
+    var.guardrails.alb_access_logs_bucket_name_final,
+    var.guardrails.cloudfront_logs_bucket_name,
+    var.guardrails.dr_frontend_bucket_name_final,
+    var.guardrails.s3_access_logs_dr_bucket_name_final,
+    var.guardrails.alb_access_logs_dr_bucket_name_final,
+    var.guardrails.cloudfront_logs_dr_bucket_name_final,
+  ]))
 }
 
 resource "aws_route53_zone" "environment" {
@@ -119,6 +129,19 @@ resource "null_resource" "guardrails" {
     precondition {
       condition     = trimspace(var.guardrails.cloudfront_logs_bucket_name) != ""
       error_message = "cloudfront_logs_bucket_name must be set because CloudFront access logs are always enabled."
+    }
+
+    precondition {
+      condition = alltrue([
+        for bucket_name in local.validated_s3_bucket_names :
+        length(bucket_name) >= 3 &&
+        length(bucket_name) <= 63 &&
+        can(regex("^[a-z0-9][a-z0-9.-]*[a-z0-9]$", bucket_name)) &&
+        !can(regex("\\.\\.", bucket_name)) &&
+        !startswith(bucket_name, "xn--") &&
+        !can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$", bucket_name))
+      ])
+      error_message = "Resolved S3 bucket names must be 3-63 chars, lowercase, use only letters/numbers/dots/hyphens, avoid consecutive dots, and must not be formatted like IPv4 addresses."
     }
 
     precondition {
@@ -257,7 +280,7 @@ data "aws_iam_policy_document" "s3_kms_key_policy" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"]
     }
 
     actions   = ["kms:*"]

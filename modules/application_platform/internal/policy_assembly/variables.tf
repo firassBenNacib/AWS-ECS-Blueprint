@@ -4,7 +4,7 @@ variable "runtime" {
     cost_optimized_dev_tier_enabled = bool
     project_name                    = string
     environment_name                = string
-    aws_region                      = string
+    smtp_host                       = string
     rds_db_name                     = string
     rds_username                    = string
   })

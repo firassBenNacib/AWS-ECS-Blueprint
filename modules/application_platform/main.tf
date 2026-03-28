@@ -101,6 +101,13 @@ module "platform_core" {
     origin_auth_previous_header_name             = var.origin_auth_previous_header_name
     enable_cloudfront_access_logs                = var.enable_cloudfront_access_logs
     cloudfront_logs_bucket_name                  = var.cloudfront_logs_bucket_name
+    frontend_bucket_name                         = module.deployment_contract.bucket_name_final
+    s3_access_logs_bucket_name_final             = module.deployment_contract.s3_access_logs_bucket_name_final
+    alb_access_logs_bucket_name_final            = module.deployment_contract.alb_access_logs_bucket_name_final
+    dr_frontend_bucket_name_final                = module.deployment_contract.dr_frontend_bucket_name_final
+    s3_access_logs_dr_bucket_name_final          = module.deployment_contract.s3_access_logs_dr_bucket_name_final
+    alb_access_logs_dr_bucket_name_final         = module.deployment_contract.alb_access_logs_dr_bucket_name_final
+    cloudfront_logs_dr_bucket_name_final         = module.deployment_contract.dr_cloudfront_logs_bucket_name_final
     effective_s3_force_destroy                   = module.deployment_contract.effective_s3_force_destroy
     s3_versioning_enabled                        = var.s3_versioning_enabled
     enable_managed_waf                           = module.deployment_contract.effective_enable_managed_waf
@@ -459,7 +466,7 @@ module "policy_assembly" {
     cost_optimized_dev_tier_enabled = module.deployment_contract.cost_optimized_dev_tier_enabled
     project_name                    = var.project_name
     environment_name                = module.deployment_contract.environment_name
-    aws_region                      = var.aws_region
+    smtp_host                       = module.deployment_contract.smtp_host_final
     rds_db_name                     = var.rds_db_name
     rds_username                    = var.rds_username
   }

@@ -20,7 +20,7 @@ on:
         required: false
         default: ""
       apply_after_plan:
-        description: "Apply the saved plan after approval"
+        description: "Regenerate and apply the approved plan after approval"
         required: false
         type: boolean
         default: false
@@ -139,7 +139,7 @@ jobs:
             echo "aws_region=${{ matrix.aws_region }}"
             echo "role_env_var=${{ matrix.role_env_var }}"
             echo "deploy_environment=${{ matrix.deploy_environment }}"
-            echo "plan_artifact_name=terraform-plan-${{ matrix.slug }}"
+            echo "plan_summary_artifact_name=terraform-plan-summary-${{ matrix.slug }}"
             echo "result_artifact_name=terraform-plan-result-${{ matrix.slug }}"
             echo "trivy_plan_artifact_name=trivy-plan-${{ matrix.slug }}"
           } >> "${GITHUB_OUTPUT}"
@@ -185,19 +185,20 @@ jobs:
           aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
           aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
 
-      - name: Create Saved Plan
+      - name: Create Deployment Plan
         id: saved_plan
         continue-on-error: true
         run: |
           artifact_dir="${RUNNER_TEMP}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}"
           mkdir -p "${artifact_dir}"
           result_json="${artifact_dir}/result.json"
-          plan_txt="${artifact_dir}/tfplan.txt"
+          plan_summary="${artifact_dir}/plan-summary.txt"
+          full_plan_txt="${artifact_dir}/tfplan.txt"
           plan_bin="${artifact_dir}/tfplan"
           plan_json="${artifact_dir}/tfplan.json"
 
           if [[ "${{ steps.deploy_prereqs.outputs.skip }}" == "true" ]]; then
-            echo "${{ steps.deploy_prereqs.outputs.reason }}" > "${plan_txt}"
+            echo "${{ steps.deploy_prereqs.outputs.reason }}" > "${plan_summary}"
             python3 .scripts/write_json_result.py \
               --output "${result_json}" \
               --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -211,12 +212,12 @@ jobs:
               --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
               --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
               --set status "skipped" \
-              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
             exit 0
           fi
 
           if [[ ! -f "${{ steps.resolve_inputs.outputs.tfvars_abs }}" ]]; then
-            echo "Resolved tfvars file does not exist: ${{ steps.resolve_inputs.outputs.tfvars_abs }}" > "${plan_txt}"
+            echo "Resolved tfvars file does not exist: ${{ steps.resolve_inputs.outputs.tfvars_abs }}" > "${plan_summary}"
             python3 .scripts/write_json_result.py \
               --output "${result_json}" \
               --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -230,7 +231,7 @@ jobs:
               --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
               --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
               --set status "error" \
-              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
             exit 1
           fi
 
@@ -239,7 +240,7 @@ jobs:
             init_args+=("-backend-config=${{ steps.resolve_inputs.outputs.backend_cfg_abs }}")
           else
             if [[ -z "${TF_BACKEND_BUCKET}" ]]; then
-              echo "Missing TF_BACKEND_BUCKET repo variable" > "${plan_txt}"
+              echo "Missing TF_BACKEND_BUCKET repo variable" > "${plan_summary}"
               python3 .scripts/write_json_result.py \
                 --output "${result_json}" \
                 --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -253,7 +254,7 @@ jobs:
                 --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
                 --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
                 --set status "error" \
-                --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+                --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
               exit 1
             fi
             backend_region="${TF_BACKEND_REGION:-${{ steps.resolve_inputs.outputs.backend_region }}}"
@@ -263,7 +264,7 @@ jobs:
             init_args+=("-backend-config=encrypt=true")
           fi
 
-          if ! terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" > "${plan_txt}" 2>&1; then
+          if ! terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" init "${init_args[@]}" > "${full_plan_txt}" 2>&1; then
             python3 .scripts/write_json_result.py \
               --output "${result_json}" \
               --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -277,23 +278,20 @@ jobs:
               --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
               --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
               --set status "error" \
-              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
             exit 1
           fi
 
           set +e
-          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -input=false -out="${plan_bin}" -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${plan_txt}" 2>&1
+          terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" plan -input=false -out="${plan_bin}" -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}" >> "${full_plan_txt}" 2>&1
           exit_code=$?
           set -e
 
           if [[ "${exit_code}" -eq 0 ]]; then
-            terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -no-color "${plan_bin}" > "${plan_txt}.rendered"
-            mv "${plan_txt}.rendered" "${plan_txt}"
+            terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -no-color "${plan_bin}" > "${full_plan_txt}.rendered"
+            awk 'BEGIN{found=0} /^No changes\\./{print; found=1} /^Plan: /{print; found=1} END{if(!found) print "Plan generated successfully."}' "${full_plan_txt}.rendered" > "${plan_summary}"
+            mv "${full_plan_txt}.rendered" "${full_plan_txt}"
             terraform -chdir="${{ steps.resolve_inputs.outputs.path }}" show -json "${plan_bin}" > "${plan_json}"
-            (
-              cd "${artifact_dir}"
-              sha256sum tfplan tfplan.txt tfplan.json > tfplan.sha256
-            )
             python3 .scripts/write_json_result.py \
               --output "${result_json}" \
               --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -307,10 +305,11 @@ jobs:
               --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
               --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
               --set status "plan_ready" \
-              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+              --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
             exit 0
           fi
 
+          cp "${full_plan_txt}" "${plan_summary}"
           python3 .scripts/write_json_result.py \
             --output "${result_json}" \
             --set path "${{ steps.resolve_inputs.outputs.path }}" \
@@ -324,7 +323,7 @@ jobs:
             --set role_env_var "${{ steps.resolve_inputs.outputs.role_env_var }}" \
             --set deploy_environment "${{ steps.resolve_inputs.outputs.deploy_environment }}" \
             --set status "error" \
-            --set artifact_name "${{ steps.resolve_inputs.outputs.plan_artifact_name }}"
+            --set artifact_name "${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}"
           exit 1
 
       - name: Advisory Trivy Plan Scan
@@ -340,17 +339,14 @@ jobs:
           exit-code: "0"
           hide-progress: true
 
-      - name: Upload Saved Plan Artifact
+      - name: Upload Plan Summary Artifact
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: ${{ steps.resolve_inputs.outputs.plan_artifact_name }}
+          name: ${{ steps.resolve_inputs.outputs.plan_summary_artifact_name }}
           retention-days: 30
           path: |
-            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan
-            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.txt
-            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.json
-            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/tfplan.sha256
+            ${{ runner.temp }}/terraform-deploy-${{ steps.resolve_inputs.outputs.slug }}/plan-summary.txt
           if-no-files-found: ignore
 
       - name: Upload Trivy Plan Artifact
@@ -420,6 +416,43 @@ jobs:
       - name: Setup Terraform
         uses: ./.github/actions/setup-terraform
 
+      - name: Resolve Inputs
+        id: resolve_inputs
+        env:
+          TFVARS_PROD_APP: ${{ secrets.TFVARS_PROD_APP }}
+          TFVARS_NONPROD_APP: ${{ secrets.TFVARS_NONPROD_APP }}
+        run: |
+          tfvars_abs=""
+          case "${{ matrix.slug }}" in
+            prod-app)
+              if [[ -n "${TFVARS_PROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-prod-app.auto.tfvars"
+                printf '%s' "${TFVARS_PROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+              fi
+              ;;
+            nonprod-app)
+              if [[ -n "${TFVARS_NONPROD_APP}" ]]; then
+                tfvars_abs="${RUNNER_TEMP}/tfvars-nonprod-app.auto.tfvars"
+                printf '%s' "${TFVARS_NONPROD_APP}" > "${tfvars_abs}"
+                chmod 600 "${tfvars_abs}"
+              fi
+              ;;
+          esac
+
+          if [[ -z "${tfvars_abs}" ]]; then
+            tfvars_abs="$(realpath "${{ matrix.tfvars_file }}")"
+          fi
+
+          {
+            echo "tfvars_abs=${tfvars_abs}"
+            if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
+              echo "backend_cfg_abs=$(realpath "${{ matrix.backend_config_file }}")"
+            else
+              echo "backend_cfg_abs="
+            fi
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Configure AWS Credentials
         uses: ./.github/actions/configure-aws-credentials
         with:
@@ -429,25 +462,16 @@ jobs:
           aws_role_arn_prod_app: ${{ secrets.AWS_ROLE_ARN_PROD_APP }}
           aws_role_arn_nonprod_app: ${{ secrets.AWS_ROLE_ARN_NONPROD_APP }}
 
-      - name: Download Saved Plan Artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ runner.temp }}/downloaded-plan-${{ matrix.slug }}
-
-      - name: Verify Saved Plan Integrity
+      - name: Regenerate and Apply Approved Plan
         run: |
-          artifact_dir="${RUNNER_TEMP}/downloaded-plan-${{ matrix.slug }}"
-          (
-            cd "${artifact_dir}"
-            sha256sum -c tfplan.sha256
-          )
+          if [[ ! -f "${{ steps.resolve_inputs.outputs.tfvars_abs }}" ]]; then
+            echo "Resolved tfvars file does not exist: ${{ steps.resolve_inputs.outputs.tfvars_abs }}"
+            exit 1
+          fi
 
-      - name: Apply Saved Plan
-        run: |
           init_args=()
-          if [[ -n "${{ matrix.backend_config_file }}" && -f "${{ matrix.backend_config_file }}" ]]; then
-            init_args+=("-backend-config=${{ matrix.backend_config_file }}")
+          if [[ -n "${{ steps.resolve_inputs.outputs.backend_cfg_abs }}" ]]; then
+            init_args+=("-backend-config=${{ steps.resolve_inputs.outputs.backend_cfg_abs }}")
           else
             test -n "${TF_BACKEND_BUCKET}" || (echo "Missing TF_BACKEND_BUCKET repo variable" && exit 1)
             backend_region="${TF_BACKEND_REGION:-${{ matrix.backend_region }}}"
@@ -457,5 +481,8 @@ jobs:
             init_args+=("-backend-config=encrypt=true")
           fi
 
+          plan_bin="${RUNNER_TEMP}/approved-plan-${{ matrix.slug }}/tfplan"
+          mkdir -p "$(dirname "${plan_bin}")"
           terraform -chdir="${{ matrix.path }}" init "${init_args[@]}"
-          terraform -chdir="${{ matrix.path }}" apply -input=false "${RUNNER_TEMP}/downloaded-plan-${{ matrix.slug }}/tfplan"
+          terraform -chdir="${{ matrix.path }}" plan -input=false -out="${plan_bin}" -var-file="${{ steps.resolve_inputs.outputs.tfvars_abs }}"
+          terraform -chdir="${{ matrix.path }}" apply -input=false "${plan_bin}"
