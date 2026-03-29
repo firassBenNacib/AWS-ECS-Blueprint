@@ -37,6 +37,7 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Builds a deployment plan for review and approval.
   - Uploads only sanitized deployment summaries/result artifacts; it does not upload raw deploy `tfplan` binaries or full plan JSON.
   - The protected apply job regenerates a saved plan after environment approval and applies that in the same job.
+  - This is intentionally a reviewed-summary-then-replan model, not an approve-and-apply-the-exact-same-plan-artifact model.
   - Prefers real target tfvars materialized from `TFVARS_PROD_APP` / `TFVARS_NONPROD_APP` GitHub secrets when those are configured.
   - Applies only after GitHub Environment approval when `apply_after_plan=true`.
 - `drift-detection.yml`
@@ -52,9 +53,9 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Uses separate destroy environments so approval rules for destructive actions can be stricter than apply rules.
 - `live-validation.yml`
   - Runs nightly for scheduled validation targets and on demand for selected deployment roots.
-  - Uses isolated local Terraform state, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
+  - Uses isolated local Terraform state files, not Terraform workspaces, performs real AWS apply/smoke/destroy cycles, and uploads validation logs.
   - Forces `live_validation_mode=true`, so the roots must use an isolated `lv-*` environment name instead of the normal `prod` / `nonprod` override.
-  - Uses a stable validation DNS label per root so the isolated Terraform workspace does not force a brand-new public hostname every run.
+  - Uses a stable validation DNS label per root so isolated local state runs do not force a brand-new public hostname every run.
   - Expects dedicated live-validation tfvars secrets for each enabled target.
   - Verifies CloudFront deployment state, Route53 alias records, and ACM certificate coverage for the generated frontend aliases before the app-profile smoke checks succeed.
   - Keep a target disabled until it has dedicated validation-only DNS and ACM certificates; do not point live validation at the exact hostnames used by a live environment.
@@ -100,6 +101,8 @@ Backend configuration for saved-plan workflows:
 
 The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. Deploy `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates against isolated local state and destroys in the same job.
 
+The checked-in `backend.hcl.example` files are intentionally minimal. Operators are expected to point them at a locking-capable remote backend and keep locking enabled; CI and deploy flows assume backend lock acquisition and use a 5-minute lock timeout around init and plan paths.
+
 ## Secrets
 
 Required repo secrets for the standard plan/apply/destroy workflows:
@@ -125,7 +128,7 @@ Live-validation tfvars secrets:
 - `LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_PROD_APP`
 - `LIVE_VALIDATION_TFVARS_PUBLIC_ALB_RESTRICTED_NONPROD_APP`
 
-Live validation also needs validation-only DNS names and matching ACM certificates baked into those tfvars values. Those tfvars now set a stable `live_validation_dns_label` such as `lv-prod` or `lv-nonprod`, while the Terraform workspace remains unique per run for safe state isolation.
+Live validation also needs validation-only DNS names and matching ACM certificates baked into those tfvars values. Those tfvars now set a stable `live_validation_dns_label` such as `lv-prod` or `lv-nonprod`, while each run keeps its own isolated local state and log directory.
 
 Environment-scoped secrets and variables are optional with the current workflow layout. The checked-in workflows read the repo-level values above by default, while GitHub environments still provide approval gates and a place to move secrets later if you want stricter separation.
 
@@ -156,6 +159,7 @@ Configure required reviewers on all of those environments to gate applies and de
 - Pull request plans are speculative and are used only for review feedback.
 - Deploy workflow plans are non-speculative but their uploaded artifacts are sanitized summaries, not raw full-plan artifacts.
 - Apply regenerates a saved plan in the protected job after environment approval and applies it there.
+- If you need strict approve-and-apply-the-exact-same-plan semantics, introduce an encrypted saved-plan transport instead of the current replan model.
 
 ## Target Catalog
 

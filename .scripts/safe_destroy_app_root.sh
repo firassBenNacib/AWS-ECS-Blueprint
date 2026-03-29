@@ -77,8 +77,26 @@ fi
 
 AWS_PREFLIGHT_TIMEOUT_SECONDS="${AWS_PREFLIGHT_TIMEOUT_SECONDS:-15}"
 
+run_aws_sts_preflight() {
+  local -a aws_cmd=(
+    aws
+    --cli-connect-timeout "${AWS_PREFLIGHT_TIMEOUT_SECONDS}"
+    --cli-read-timeout "${AWS_PREFLIGHT_TIMEOUT_SECONDS}"
+    sts
+    get-caller-identity
+    --output json
+  )
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${AWS_PREFLIGHT_TIMEOUT_SECONDS}" "${aws_cmd[@]}"
+    return $?
+  fi
+
+  "${aws_cmd[@]}"
+}
+
 preflight_aws_access() {
-  if timeout "${AWS_PREFLIGHT_TIMEOUT_SECONDS}" aws sts get-caller-identity --output json >/dev/null 2>&1; then
+  if run_aws_sts_preflight >/dev/null 2>&1; then
     return 0
   fi
 
