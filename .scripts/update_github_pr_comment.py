@@ -4,20 +4,23 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
-import urllib.error
-import urllib.request
-from pathlib import Path
+import re
 from typing import Any
 
+from path_safety import resolve_existing_file
 
-API_BASE = "https://api.github.com"
+
 JsonObject = dict[str, Any]
 JsonList = list[JsonObject]
+REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
-def api_request(method: str, url: str, token: str, payload: dict[str, Any] | None = None) -> JsonObject | JsonList:
+def api_request(method: str, path: str, token: str, payload: dict[str, Any] | None = None) -> JsonObject | JsonList:
+    if not path.startswith("/repos/"):
+        raise ValueError(f"Only GitHub repository API requests are allowed, got {path}")
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",
@@ -29,19 +32,20 @@ def api_request(method: str, url: str, token: str, payload: dict[str, Any] | Non
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
 
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    connection = http.client.HTTPSConnection("api.github.com")
     try:
-        with urllib.request.urlopen(request) as response:
-            body = response.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{method} {url} failed: {exc.code} {detail}") from exc
+        connection.request(method, path, body=data, headers=headers)
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        if response.status >= 400:
+            raise RuntimeError(f"{method} {path} failed: {response.status} {body}")
+    finally:
+        connection.close()
     return json.loads(body) if body else {}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", required=True)
     parser.add_argument("--pr-number", required=True, type=int)
     parser.add_argument("--marker", required=True)
     parser.add_argument("--body-file", required=True)
@@ -53,9 +57,12 @@ def main() -> int:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise RuntimeError("GITHUB_TOKEN is required")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if not repo or not REPO_PATTERN.fullmatch(repo):
+        raise RuntimeError("GITHUB_REPOSITORY must be set to owner/repo")
 
-    body = Path(args.body_file).read_text()
-    comments_url = f"{API_BASE}/repos/{args.repo}/issues/{args.pr_number}/comments?per_page=100"
+    body = resolve_existing_file(args.body_file, description="PR comment body file", include_temp=False).read_text(encoding="utf-8")
+    comments_url = f"/repos/{repo}/issues/{args.pr_number}/comments?per_page=100"
     comments_response = api_request("GET", comments_url, token)
     if not isinstance(comments_response, list):
         raise RuntimeError(f"Expected a list response from GitHub comments API, got {type(comments_response).__name__}")
@@ -70,7 +77,7 @@ def main() -> int:
     if existing_comment:
         api_request(
             "PATCH",
-            f"{API_BASE}/repos/{args.repo}/issues/comments/{existing_comment['id']}",
+            f"/repos/{repo}/issues/comments/{existing_comment['id']}",
             token,
             {"body": body},
         )
@@ -78,7 +85,7 @@ def main() -> int:
     else:
         created_response = api_request(
             "POST",
-            f"{API_BASE}/repos/{args.repo}/issues/{args.pr_number}/comments",
+            f"/repos/{repo}/issues/{args.pr_number}/comments",
             token,
             {"body": body},
         )

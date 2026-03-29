@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
-import pathlib
 import re
 import sys
+
+from path_safety import resolve_existing_file
 
 
 def main() -> int:
@@ -13,8 +14,8 @@ def main() -> int:
         print("usage: normalize_legacy_tfvars_for_ci.py <tfvars-path>", file=sys.stderr)
         return 2
 
-    path = pathlib.Path(sys.argv[1])
-    text = path.read_text()
+    path = resolve_existing_file(sys.argv[1], description="tfvars file")
+    text = path.read_text(encoding="utf-8")
     changes: list[str] = []
 
     updated = re.sub(
@@ -31,7 +32,7 @@ def main() -> int:
         changes.append("removed legacy backend_failover_domain_name input")
         text = updated
 
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     print("; ".join(changes))
     return 0
 

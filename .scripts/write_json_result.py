@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
+
+from path_safety import resolve_output_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    output_path = resolve_output_file(args.output, description="JSON result output file")
     payload: dict[str, object] = {}
 
     for key, value in args.string_fields:
@@ -59,7 +61,7 @@ def main() -> int:
     for key, value in args.nullable_int_fields:
         payload[key] = None if value == "null" else int(value)
 
-    Path(args.output).write_text(json.dumps(payload))
+    output_path.write_text(json.dumps(payload), encoding="utf-8")
     return 0
 
 

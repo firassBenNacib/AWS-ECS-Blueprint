@@ -383,7 +383,6 @@ jobs:
       - name: Update Sticky PR Comment
         run: |
           python3 .scripts/update_github_pr_comment.py \
-            --repo "${{ github.repository }}" \
             --pr-number "${{ github.event.pull_request.number }}" \
             --marker "<!-- terraform-pr-plan -->" \
             --body-file pr-comment.md

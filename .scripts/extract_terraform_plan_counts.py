@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import argparse
 import re
-from pathlib import Path
+
+from path_safety import resolve_existing_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,7 +17,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    text = Path(args.plan_file).read_text(encoding="utf-8")
+    plan_file = resolve_existing_file(args.plan_file, description="Terraform plan text file")
+    text = plan_file.read_text(encoding="utf-8")
     match = re.search(r"Plan:\s+(\d+)\s+to add,\s+(\d+)\s+to change,\s+(\d+)\s+to destroy\.", text)
     if not match:
         print("0 0 0")
