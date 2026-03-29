@@ -85,7 +85,6 @@ jobs:
             echo "path=${{ matrix.path }}"
             echo "slug=${{ matrix.slug }}"
             echo "label=${{ matrix.label }}"
-            echo "workspace=lv-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}"
             echo "aws_region=${{ matrix.aws_region }}"
             echo "role_env_var=${{ matrix.role_env_var }}"
             echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}"
@@ -139,7 +138,6 @@ jobs:
         run: |
           bash .scripts/run_live_validation.sh \
             --path "${{ steps.resolve_inputs.outputs.path }}" \
-            --workspace "${{ steps.resolve_inputs.outputs.workspace }}" \
             --tfvars-file "${{ steps.tfvars.outputs.tfvars_path }}" \
             --aws-region "${{ steps.resolve_inputs.outputs.aws_region }}" \
             --smoke-profile "${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}" \

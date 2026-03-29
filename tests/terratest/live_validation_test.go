@@ -18,14 +18,10 @@ func TestLiveValidationE2E(t *testing.T) {
 	repoRoot := getEnvOrDefault("E2E_REPO_ROOT", repoRootFromHere(t))
 	terraformRoot := requireEnvOrSkip(t, "E2E_TERRAFORM_ROOT")
 	awsRegion := requireEnvOrSkip(t, "E2E_AWS_REGION")
-	baseWorkspace := getEnvOrDefault("E2E_WORKSPACE", fmt.Sprintf(
-		"tt-%d-%s",
-		time.Now().UTC().Unix(),
-		sanitizeName(filepath.Base(terraformRoot)),
-	))
+	runLabel := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	baseLogDir := getEnvOrDefault(
 		"E2E_LOG_DIR",
-		filepath.Join(os.TempDir(), "aws-ecs-blueprint-terratest", sanitizeName(filepath.Base(terraformRoot)), baseWorkspace),
+		filepath.Join(os.TempDir(), "aws-ecs-blueprint-terratest", sanitizeName(filepath.Base(terraformRoot)), runLabel),
 	)
 	retries := getEnvIntOrDefault("E2E_TERRATEST_RETRIES", 0)
 
@@ -68,10 +64,8 @@ func TestLiveValidationE2E(t *testing.T) {
 		}
 
 		t.Run(scenario.name, func(t *testing.T) {
-			workspace := baseWorkspace
 			logDir := baseLogDir
 			if scenario.name != "default" {
-				workspace = fmt.Sprintf("%s-%s", baseWorkspace, sanitizeName(scenario.name))
 				logDir = filepath.Join(baseLogDir, sanitizeName(scenario.name))
 			}
 
@@ -82,7 +76,6 @@ func TestLiveValidationE2E(t *testing.T) {
 				tfvarsFile,
 				awsRegion,
 				scenario.smokeProfile,
-				workspace,
 				logDir,
 				retries,
 			)
@@ -146,7 +139,6 @@ func runLiveValidationScenario(
 	tfvarsFile string,
 	awsRegion string,
 	smokeProfile string,
-	workspace string,
 	logDir string,
 	retries int,
 ) {
@@ -161,7 +153,6 @@ func runLiveValidationScenario(
 		Args: []string{
 			".scripts/run_live_validation.sh",
 			"--path", terraformRoot,
-			"--workspace", workspace,
 			"--tfvars-file", tfvarsFile,
 			"--aws-region", awsRegion,
 			"--smoke-profile", smokeProfile,
@@ -189,7 +180,7 @@ func runLiveValidationScenario(
 
 func logKnownArtifacts(t *testing.T, logDir string) {
 	t.Helper()
-	for _, name := range []string{"init.log", "apply.log", "smoke.log", "destroy-init.log", "destroy.log", "workspace.log"} {
+	for _, name := range []string{"init.log", "apply.log", "smoke.log", "destroy-init.log", "destroy.log", "state.log"} {
 		path := filepath.Join(logDir, name)
 		content, err := os.ReadFile(path)
 		if err != nil {

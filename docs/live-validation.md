@@ -18,7 +18,7 @@ Each live validation run:
 5. runs smoke checks for the target profile
 6. destroys the environment in the same run
 
-The live validation environment uses a stable DNS label such as `lv-prod` or `lv-nonprod`, but an isolated Terraform workspace/state for each run.
+The live validation environment uses a stable DNS label such as `lv-prod` or `lv-nonprod`, but an isolated local Terraform state file for each run.
 
 ## Prerequisites
 

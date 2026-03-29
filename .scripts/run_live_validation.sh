@@ -2,12 +2,11 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 --path PATH --workspace WORKSPACE --tfvars-file FILE --aws-region REGION --smoke-profile PROFILE --log-dir DIR" >&2
+  echo "Usage: $0 --path PATH --tfvars-file FILE --aws-region REGION --smoke-profile PROFILE --log-dir DIR" >&2
   exit 1
 }
 
 PATH_ARG=""
-WORKSPACE=""
 TFVARS_FILE=""
 AWS_REGION=""
 SMOKE_PROFILE=""
@@ -17,10 +16,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --path)
       PATH_ARG=$2
-      shift 2
-      ;;
-    --workspace)
-      WORKSPACE=$2
       shift 2
       ;;
     --tfvars-file)
@@ -45,7 +40,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "${PATH_ARG}" && -n "${WORKSPACE}" && -n "${TFVARS_FILE}" && -n "${AWS_REGION}" && -n "${SMOKE_PROFILE}" && -n "${LOG_DIR}" ]] || usage
+[[ -n "${PATH_ARG}" && -n "${TFVARS_FILE}" && -n "${AWS_REGION}" && -n "${SMOKE_PROFILE}" && -n "${LOG_DIR}" ]] || usage
 
 mkdir -p "${LOG_DIR}"
 
@@ -88,7 +83,7 @@ trap cleanup EXIT
 TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" init -backend=false -reconfigure > "${LOG_DIR}/init.log" 2>&1
 initialized=1
 
-echo "Using isolated local state at ${state_file}" > "${LOG_DIR}/workspace.log"
+echo "Using isolated local state at ${state_file}" > "${LOG_DIR}/state.log"
 
 TF_DATA_DIR="${tf_data_dir}" terraform -chdir="${PATH_ARG}" apply \
   -auto-approve \

@@ -167,6 +167,8 @@ Use the checked-in example files as templates:
 - [`nonprod-app/terraform.frontend-ecs.tfvars.example`](./nonprod-app/terraform.frontend-ecs.tfvars.example)
 - [`nonprod-app/terraform.public-alb-restricted.tfvars.example`](./nonprod-app/terraform.public-alb-restricted.tfvars.example)
 
+The `backend.hcl.example` files are intentionally minimal. Point them at a locking-capable remote backend and keep locking enabled; the CI, plan, deploy, and drift workflows all assume backend lock acquisition and use a 5-minute lock timeout around init and plan paths.
+
 The curated example profiles are intended to cover:
 
 - default workload roots
@@ -250,6 +252,8 @@ The repository uses a focused workflow set under [`.github/workflows/`](./.githu
 - `terraform-docs.yml`: module documentation drift checks
 - `allowlist-expiry.yml`: allowlist governance checks
 - `actionlint.yml`: workflow and composite action linting
+
+The deploy path is intentionally a reviewed-summary-then-replan model. GitHub environment approval happens before the protected apply job regenerates and applies a fresh plan, rather than approving and applying the exact same uploaded plan artifact.
 
 Repository variables required for the normal plan, deploy, and destroy path:
 

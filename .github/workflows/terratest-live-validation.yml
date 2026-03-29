@@ -91,7 +91,6 @@ jobs:
             echo "path=${{ matrix.path }}"
             echo "slug=${{ matrix.slug }}"
             echo "label=${{ matrix.label }}"
-            echo "workspace=tt-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slug }}"
             echo "aws_region=${{ matrix.aws_region }}"
             echo "role_env_var=${{ matrix.role_env_var }}"
             echo "live_validation_tfvars_env_var=${{ matrix.live_validation_tfvars_env_var }}"
@@ -181,7 +180,6 @@ jobs:
           E2E_REPO_ROOT: ${{ github.workspace }}
           E2E_TERRAFORM_ROOT: ${{ github.workspace }}/${{ steps.resolve_inputs.outputs.path }}
           E2E_TFVARS_FILE: ${{ steps.tfvars.outputs.tfvars_path }}
-          E2E_WORKSPACE: ${{ steps.resolve_inputs.outputs.workspace }}
           E2E_AWS_REGION: ${{ steps.resolve_inputs.outputs.aws_region }}
           E2E_SMOKE_PROFILE: ${{ steps.resolve_inputs.outputs.live_validation_smoke_profile }}
           E2E_LOG_DIR: ${{ steps.resolve_inputs.outputs.log_dir }}

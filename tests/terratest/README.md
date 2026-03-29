@@ -26,7 +26,6 @@ The Terratest path is intentionally narrow:
 Optional:
 
 - `E2E_REPO_ROOT`
-- `E2E_WORKSPACE`
 - `E2E_LOG_DIR`
 - `E2E_TERRATEST_RETRIES`
 - `E2E_FRONTEND_ECS_TFVARS_FILE`
