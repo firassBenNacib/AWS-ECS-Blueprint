@@ -261,6 +261,10 @@ Repository variables required for the normal plan, deploy, and destroy path:
 - `TF_BACKEND_BUCKET`
 - `TF_BACKEND_REGION`
 
+Optional repository variables:
+
+- `ENABLE_DRIFT_DETECTION=false` to disable only the scheduled `drift-detection.yml` run while environments are intentionally absent; manual drift checks still work through `workflow_dispatch`
+
 Repository secrets required for the normal GitHub OIDC plan, deploy, and destroy path:
 
 - `AWS_ROLE_ARN_PROD_APP`

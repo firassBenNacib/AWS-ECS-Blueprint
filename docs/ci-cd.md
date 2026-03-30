@@ -45,6 +45,7 @@ The repository uses a focused workflow layout: smaller, purpose-specific workflo
   - Reuses the normal root backend and tfvars wiring to detect live-state drift without applying changes.
   - Uses backend locking with a 5-minute timeout so drift checks do not race against concurrent apply jobs.
   - Fails when Terraform returns a detailed-exitcode drift plan and uploads the drift plan artifact for review.
+  - Set `ENABLE_DRIFT_DETECTION=false` as a repo variable when environments are intentionally destroyed and you want scheduled drift checks to no-op without affecting manual drift runs.
 - `destroy.yml`
   - Runs on `workflow_dispatch` only.
   - Requires a confirmation string matching `destroy <target>` after whitespace normalization before any AWS credentials are used.
@@ -98,6 +99,12 @@ Backend configuration for saved-plan workflows:
 
 - `TF_BACKEND_BUCKET`
 - `TF_BACKEND_REGION`
+
+Operational toggles:
+
+- `ENABLE_DRIFT_DETECTION`
+  - Default when unset: enabled
+  - Set it to `false` when environments are intentionally absent and you want only the scheduled `drift-detection.yml` run to skip; manual `workflow_dispatch` drift checks still run
 
 The deploy and PR-plan workflows default to `TF_BACKEND_BUCKET` plus the target-specific backend key in `ci/terraform-targets.json`. Deploy `workflow_dispatch` can still override that with an explicit backend config path when needed. Live validation does not use the shared backend because it validates against isolated local state and destroys in the same job.
 
