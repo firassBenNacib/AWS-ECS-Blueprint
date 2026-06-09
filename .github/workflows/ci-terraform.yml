@@ -253,6 +253,14 @@ jobs:
             exit 0
           fi
 
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_NAME}" != "main" ]]; then
+            {
+              echo "skip=true"
+              echo "reason=Skipping tag report for non-main push branches because AWS OIDC trust is limited to reviewed contexts."
+            } >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
           if [[ "${GITHUB_EVENT_NAME}" == "push" && ( "${GITHUB_REF_NAME}" == dependabot/* || "${GITHUB_ACTOR}" == "dependabot[bot]" ) ]]; then
             {
               echo "skip=true"
@@ -300,7 +308,7 @@ jobs:
 
       - name: Upload tag coverage artifact
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tag-report-${{ matrix.slug }}
           retention-days: 30
@@ -320,7 +328,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Cache TFLint plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.tflint.d/plugins
           key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
@@ -343,7 +351,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Cache TFLint plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.tflint.d/plugins
           key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
@@ -387,7 +395,7 @@ jobs:
 
       - name: Upload Checkov artifact
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: checkov-${{ matrix.slug }}
           retention-days: 30
@@ -421,7 +429,7 @@ jobs:
 
       - name: Upload tfsec artifact
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tfsec-${{ matrix.slug }}
           retention-days: 30
@@ -435,7 +443,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Trivy config scan
-        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # 0.24.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           scan-type: "config"
           scan-ref: "."
@@ -447,7 +455,7 @@ jobs:
 
       - name: Upload Trivy config artifact
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: trivy-config
           retention-days: 30
@@ -474,7 +482,7 @@ jobs:
 
       - name: Upload Terrascan artifact
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: terrascan
           retention-days: 30
