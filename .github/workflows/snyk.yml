@@ -13,37 +13,47 @@ env:
   SNYK_ORG: firassbennacib
 
 jobs:
-  snyk-open-source:
-    name: Snyk Open Source
+  snyk-access:
+    name: Snyk Access
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     outputs:
-      configured: ${{ steps.snyk-token.outputs.configured }}
+      configured: ${{ steps.snyk-access.outputs.configured }}
     steps:
-      - name: Detect Snyk token
-        id: snyk-token
+      - name: Validate Snyk access
+        id: snyk-access
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          if [ -n "${SNYK_TOKEN}" ]; then
+          if [ -z "${SNYK_TOKEN}" ]; then
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SNYK_TOKEN is not configured; skipping Snyk scans."
+            exit 0
+          fi
+
+          if npx -y snyk whoami --org="${SNYK_ORG}" >/dev/null 2>&1; then
             echo "configured=true" >> "${GITHUB_OUTPUT}"
           else
             echo "configured=false" >> "${GITHUB_OUTPUT}"
-            echo "SNYK_TOKEN is not configured; skipping Snyk open-source scan."
+            echo "::warning::SNYK_TOKEN is configured, but Snyk rejected the token or organization access; skipping Snyk scans."
           fi
 
+  snyk-open-source:
+    name: Snyk Open Source
+    needs: snyk-access
+    if: needs.snyk-access.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
       - name: Checkout
-        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Go
-        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: tests/terratest/go.mod
 
       - name: Test Terratest module dependencies
-        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -54,29 +64,15 @@ jobs:
 
   snyk-code:
     name: Snyk Code
+    needs: snyk-access
+    if: needs.snyk-access.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      configured: ${{ steps.snyk-token.outputs.configured }}
     steps:
-      - name: Detect Snyk token
-        id: snyk-token
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          if [ -n "${SNYK_TOKEN}" ]; then
-            echo "configured=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "configured=false" >> "${GITHUB_OUTPUT}"
-            echo "SNYK_TOKEN is not configured; skipping Snyk Code scan."
-          fi
-
       - name: Checkout
-        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test repository source code
-        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -86,29 +82,15 @@ jobs:
 
   snyk-iac:
     name: Snyk IaC
+    needs: snyk-access
+    if: needs.snyk-access.outputs.configured == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      configured: ${{ steps.snyk-token.outputs.configured }}
     steps:
-      - name: Detect Snyk token
-        id: snyk-token
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          if [ -n "${SNYK_TOKEN}" ]; then
-            echo "configured=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "configured=false" >> "${GITHUB_OUTPUT}"
-            echo "SNYK_TOKEN is not configured; skipping Snyk IaC scan."
-          fi
-
       - name: Checkout
-        if: steps.snyk-token.outputs.configured == 'true'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test Terraform configuration
-        if: steps.snyk-token.outputs.configured == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -120,6 +102,7 @@ jobs:
     name: Snyk
     if: always()
     needs:
+      - snyk-access
       - snyk-open-source
       - snyk-code
       - snyk-iac
@@ -138,8 +121,8 @@ jobs:
           }
           if failures:
               raise SystemExit(f"Snyk workflow failures: {failures}")
-          if all(data.get("outputs", {}).get("configured") == "false" for data in needs.values()):
-              print("SNYK_TOKEN is not configured; Snyk jobs were skipped.")
+          if needs["snyk-access"].get("outputs", {}).get("configured") == "false":
+              print("Snyk access is not configured or was rejected; Snyk scan jobs were skipped.")
           else:
               print("Snyk workflow passed.")
           PY
