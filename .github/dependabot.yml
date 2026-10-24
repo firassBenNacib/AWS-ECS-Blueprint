@@ -8,6 +8,13 @@ updates:
       - dependencies
       - github-actions
 
+  - package-ecosystem: gomod
+    directory: /tests/terratest
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
   - package-ecosystem: terraform
     directories:
       - /
@@ -18,4 +25,3 @@ updates:
       interval: weekly
     labels:
       - dependencies
-      - terraform
