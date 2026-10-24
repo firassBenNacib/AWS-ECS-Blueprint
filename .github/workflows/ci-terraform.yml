@@ -308,7 +308,7 @@ jobs:
 
       - name: Upload tag coverage artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tag-report-${{ matrix.slug }}
           retention-days: 30
@@ -334,7 +334,7 @@ jobs:
           key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: v0.61.0
 
@@ -357,7 +357,7 @@ jobs:
           key: tflint-${{ runner.os }}-${{ hashFiles('**/tflint.hcl') }}
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: v0.61.0
 
@@ -395,7 +395,7 @@ jobs:
 
       - name: Upload Checkov artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: checkov-${{ matrix.slug }}
           retention-days: 30
@@ -429,7 +429,7 @@ jobs:
 
       - name: Upload tfsec artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tfsec-${{ matrix.slug }}
           retention-days: 30
@@ -455,7 +455,7 @@ jobs:
 
       - name: Upload Trivy config artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: trivy-config
           retention-days: 30
@@ -482,7 +482,7 @@ jobs:
 
       - name: Upload Terrascan artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: terrascan
           retention-days: 30
