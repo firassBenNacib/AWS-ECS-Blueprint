@@ -13,6 +13,7 @@ on:
       - ".scripts/**"
       - "prod-app/**"
       - "nonprod-app/**"
+      - "tests/terratest/**"
       - "live-validation-bootstrap/**"
       - "*.tf"
       - "*.tfvars"
@@ -32,6 +33,7 @@ on:
       - ".scripts/**"
       - "prod-app/**"
       - "nonprod-app/**"
+      - "tests/terratest/**"
       - "live-validation-bootstrap/**"
       - "*.tf"
       - "*.tfvars"
@@ -538,3 +540,4 @@ jobs:
               raise SystemExit(f"Terraform CI workflow failures: {failures}")
           print("Terraform CI workflow passed.")
           PY
+
